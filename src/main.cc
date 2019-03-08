@@ -77,6 +77,70 @@ size_t factorial(size_t n) {
   return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
 }
 
+Eigen::MatrixXd QuadraticMatrix(
+    const size_t polynomial_order,
+    const size_t derivative_order,
+    const double dt) {
+  Eigen::MatrixXd base_integrated_quadratic_matrix;
+  base_integrated_quadratic_matrix.resize(polynomial_order + 1, polynomial_order + 1);
+  base_integrated_quadratic_matrix.fill(0);
+  for(size_t row = 0; row < polynomial_order + 1; ++row) {
+    for(size_t col = 0; col < polynomial_order + 1; ++col) {
+      base_integrated_quadratic_matrix(row, col) = 
+        std::pow(dt, row + col + 1) 
+        / factorial(row) 
+        / factorial(col) 
+        / (row + col + 1);
+    }
+  }
+
+  Eigen::MatrixXd ones_vec;
+  ones_vec.resize(polynomial_order + 1 - derivative_order, 1);
+  ones_vec.fill(1);
+
+  Eigen::MatrixXd row_shift_mat;
+  row_shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
+  row_shift_mat.fill(0);
+  row_shift_mat.diagonal(-1*derivative_order) = ones_vec;
+
+  Eigen::MatrixXd col_shift_mat;
+  col_shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
+  col_shift_mat.fill(0);
+  col_shift_mat.diagonal(+1*derivative_order) = ones_vec;
+
+  Eigen::MatrixXd integrated_quadratic_matrix;
+  integrated_quadratic_matrix.resize(polynomial_order + 1, polynomial_order + 1);
+  integrated_quadratic_matrix = row_shift_mat * base_integrated_quadratic_matrix * col_shift_mat;
+
+  return integrated_quadratic_matrix;
+}
+
+Eigen::MatrixXd CoefficientVector(
+    const size_t polynomial_order, 
+    const size_t derivative_order, 
+    const double dt) {
+  Eigen::MatrixXd base_coefficient_vec;
+  base_coefficient_vec.resize(polynomial_order + 1,1);
+  for(size_t idx = 0; idx < polynomial_order + 1; ++idx) {
+    base_coefficient_vec(idx, 0) = std::pow(dt, idx) / factorial(idx);
+  }
+
+  Eigen::MatrixXd ones_vec;
+  ones_vec.resize(polynomial_order + 1 - derivative_order, 1);
+  ones_vec.fill(1);
+
+  Eigen::MatrixXd shift_mat;
+  shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
+  shift_mat.fill(0);
+  shift_mat.diagonal(-1*derivative_order) = ones_vec;
+
+  Eigen::MatrixXd coefficient_vec;
+  coefficient_vec.resize(polynomial_order + 1, 1);
+  coefficient_vec = shift_mat * base_coefficient_vec;
+
+  return coefficient_vec;
+}
+
 template <size_t DIMENSION>
 void Path2PVA(
     const std::vector<PathConstraint<DIMENSION>>& pos_constraints,
@@ -96,26 +160,42 @@ void Path2PVA(
 
   // TODO: Check sorted by increasing index
 
-  constexpr size_t MIN_DERIVATIVE_IDX        = 2; // 5 is snap
-  constexpr size_t POLYNOMIAL_SIZE           = 2; // Order of polynomial. Usually 7
-  constexpr size_t NUM_CONTINUOUS_PARAMETERS = (POLYNOMIAL_SIZE + 1); // Usually 5
-  constexpr double WIGGLE                    = 1e-4;
+  constexpr size_t DERIVATIVE_ORDER          = 2;                      // 2 is acceleration, 4 is snap
+  constexpr size_t POLYNOMIAL_ORDER          = DERIVATIVE_ORDER + 3; // Usually 7
+  constexpr size_t CONTINUITY_ORDER          = 2;                      // Usually 5
+  constexpr double WIGGLE                    = 0;
   const size_t num_nodes                     = times.size();
   const size_t num_intermediate_nodes        = times.size() - 2;
   const size_t num_segments                  = times.size() - 1;
-  const size_t num_parameters_per_segment    = DIMENSION * (POLYNOMIAL_SIZE + 1);
-  const size_t num_parameters                = DIMENSION * (POLYNOMIAL_SIZE + 1) * num_nodes;
+  const size_t num_parameters_per_segment    = DIMENSION * (POLYNOMIAL_ORDER + 1);
+  const size_t num_parameters_per_dimension  = (POLYNOMIAL_ORDER + 1);
+  const size_t num_parameters                = DIMENSION * (POLYNOMIAL_ORDER + 1) * num_nodes;
+
 
   // The start and end are constrained by three derivatives
   // Each segment is constrained by NUM_CONTINUOUS_DERIVATIVES
   // The last segment is constrained by only three derivatives
-  const size_t num_constraints = 2*DIMENSION*3 + DIMENSION*NUM_CONTINUOUS_PARAMETERS*(num_segments - 1);
+  // Each intermediate node is constrained by something
+  constexpr size_t NUM_NODAL_CONSTRAINTS_PER_DIMENSION  = 3;
+  constexpr size_t NUM_NODAL_CONSTRAINTS                = NUM_NODAL_CONSTRAINTS_PER_DIMENSION * DIMENSION;
+
+  const size_t num_constraints = 0
+    + 2*NUM_NODAL_CONSTRAINTS                                       // Start,end
+    + num_intermediate_nodes*NUM_NODAL_CONSTRAINTS                  // Intermediate, 3 is temporary
+    + DIMENSION*CONTINUITY_ORDER*(num_segments - 1)                 // Continuity
+    + NUM_NODAL_CONSTRAINTS;                                        // Final continuity segment
 
   /* NOTES
    * 1) Constraints are ordered in the following way:
-   *  a) Node
+   *  a) Node 
    *  b) Continuity
    *  c) SFC
+   *
+   * 2) Polynomial size must be greater than derivative idx by 3 or more
+   * 3) Permutation of constraints is node, dimension, order. Example: All of the
+   *    polynomial coefficients for x for the first node, then all the polynomial coefficients for
+   *    y for the first node, the all the polynomial coefficients for x for the
+   *    second node, etc
    */
 
   /* 
@@ -129,45 +209,39 @@ void Path2PVA(
   size_t bound_idx = 0;
 
   { // Node bounds
-    std::queue<PathConstraint<DIMENSION>> pos_queue, vel_queue, acc_queue;
-    for(const auto& el: pos_constraints) { pos_queue.push(el); };
-    for(const auto& el: vel_constraints) { vel_queue.push(el); };
-    for(const auto& el: acc_constraints) { acc_queue.push(el); };
+    // TODO: What if only intermediate position constraints?
+    for(size_t node_idx = 0; node_idx < num_nodes; ++node_idx) {
+      for(size_t dim = 0; dim < DIMENSION; ++dim) { 
+        lower_bound(bound_idx,0) = pos_constraints[node_idx].constraint(dim);
+        upper_bound(bound_idx,0) = pos_constraints[node_idx].constraint(dim);
+        bound_idx++;
 
-    for(size_t node_idx = 0; node_idx < num_nodes-1; ++node_idx) {
-      if(node_idx == pos_queue.front().index) {
-        lower_bound.block<DIMENSION,1>(bound_idx, 0) = pos_queue.front().constraint - Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        upper_bound.block<DIMENSION,1>(bound_idx, 0) = pos_queue.front().constraint + Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        bound_idx += DIMENSION;
-        pos_queue.pop();
+        lower_bound(bound_idx,0) = vel_constraints[node_idx].constraint(dim);
+        upper_bound(bound_idx,0) = vel_constraints[node_idx].constraint(dim);
+        bound_idx++;
+
+        lower_bound(bound_idx,0) = acc_constraints[node_idx].constraint(dim);
+        upper_bound(bound_idx,0) = acc_constraints[node_idx].constraint(dim);
+        bound_idx++;
       }
-      if(node_idx == vel_queue.front().index) {
-        lower_bound.block<DIMENSION,1>(bound_idx, 0) = vel_queue.front().constraint - Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        upper_bound.block<DIMENSION,1>(bound_idx, 0) = vel_queue.front().constraint + Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        bound_idx += DIMENSION;
-        vel_queue.pop();
-      }
-      if(node_idx == acc_queue.front().index) {
-        lower_bound.block<DIMENSION,1>(bound_idx, 0) = acc_queue.front().constraint - Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        upper_bound.block<DIMENSION,1>(bound_idx, 0) = acc_queue.front().constraint + Eigen::Matrix<double, DIMENSION, 1>::Ones() * WIGGLE;
-        bound_idx += DIMENSION;
-        vel_queue.pop();
-      } 
     }
   }
 
   { // Continuity bounds
     // Note: The number of continuity bounds is unique for the final segment
     for(size_t segment_idx = 0; segment_idx < num_segments; ++segment_idx) {
-      const size_t num_continuity_constraints = 
-        (segment_idx == num_segments - 1) ? 3 : NUM_CONTINUOUS_PARAMETERS;
+      for(size_t dim = 0; dim < DIMENSION; ++dim) {
+        const size_t num_continuity_constraints = 
+          (segment_idx == num_segments - 1) ? 3 : CONTINUITY_ORDER;
 
-      lower_bound.block(bound_idx, 0, num_continuity_constraints, 1) 
-        = Eigen::MatrixXd::Ones(num_continuity_constraints,1) * WIGGLE * -1;
+        lower_bound.block(bound_idx, 0, num_continuity_constraints, 1) 
+          = Eigen::MatrixXd::Ones(num_continuity_constraints,1) * WIGGLE * -1;
 
-      upper_bound.block(bound_idx, 0, num_continuity_constraints, 1) 
-        = Eigen::MatrixXd::Ones(num_continuity_constraints,1) * WIGGLE * +1;
-      bound_idx += num_continuity_constraints;
+        upper_bound.block(bound_idx, 0, num_continuity_constraints, 1) 
+          = Eigen::MatrixXd::Ones(num_continuity_constraints,1) * WIGGLE * +1;
+
+        bound_idx += num_continuity_constraints;
+      }
     }
   }
 
@@ -183,73 +257,56 @@ void Path2PVA(
   size_t constraint_idx = 0;
 
   { // Node Constraints
-    // Helper constants
-    const size_t pos_idx = 0;
-    const size_t vel_idx = DIMENSION;
-    const size_t acc_idx = 2*DIMENSION;
-
-    std::queue<PathConstraint<DIMENSION>> pos_queue, vel_queue, acc_queue;
-    for(const auto& el: pos_constraints) { pos_queue.push(el); };
-    for(const auto& el: vel_constraints) { vel_queue.push(el); };
-    for(const auto& el: acc_constraints) { acc_queue.push(el); };
-
-    for(size_t node_idx = 0; node_idx < num_nodes-1; ++node_idx) {
-      if(node_idx == pos_queue.front().index) {
-        dense_constraint_matrix.block<DIMENSION,DIMENSION>(constraint_idx, pos_idx) = Eigen::Matrix<double, DIMENSION, DIMENSION>::Identity();
-        pos_queue.pop();
-        constraint_idx += DIMENSION;
-      }
-      if(node_idx == vel_queue.front().index) {
-        dense_constraint_matrix.block<DIMENSION,DIMENSION>(constraint_idx, vel_idx) = Eigen::Matrix<double, DIMENSION, DIMENSION>::Identity();
-        vel_queue.pop();
-        constraint_idx += DIMENSION;
-      }
-      if(node_idx == acc_queue.front().index) {
-        dense_constraint_matrix.block<DIMENSION,DIMENSION>(constraint_idx, acc_idx) = Eigen::Matrix<double, DIMENSION, DIMENSION>::Identity();
-        acc_queue.pop();
-        constraint_idx += DIMENSION;
+    // TODO: What if only position constraints?
+    for(size_t node_idx = 0; node_idx < num_nodes; ++node_idx) {
+      for(size_t dim = 0; dim < DIMENSION; ++dim) { 
+        const size_t parameter_idx = node_idx * num_parameters_per_segment + dim * num_parameters_per_dimension;
+        dense_constraint_matrix.block<3,3>(constraint_idx,parameter_idx) = Eigen::Matrix<double, 3, 3>::Identity();
+        constraint_idx += 3;
       }
     }
   }
 
   { // Continuity Constraints
-    // Note: The number of continuity bounds is unique for the final segment
     for(size_t segment_idx = 0; segment_idx < num_segments; ++segment_idx) {
-      const size_t segment_start_idx = num_parameters_per_segment * segment_idx;
-      const size_t segment_end_idx = segment_start_idx + (num_parameters_per_segment * 1);
+      const size_t this_segment_parameter_idx = num_parameters_per_segment * segment_idx;
+      const size_t next_segment_parameter_idx = num_parameters_per_segment * (segment_idx + 1);
+
       // Time per segment is scaled to 1 for numerical stability. Must un-scale at end.
       const double delta_t = 1.0;
-      const size_t num_continuity_constraints = 
-        (segment_idx == num_segments - 1) ? 3 : NUM_CONTINUOUS_PARAMETERS;
-      for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
-        const size_t segment_parameter_start_idx = segment_start_idx + continuity_idx * DIMENSION;
-        const size_t segment_parameter_end_idx = segment_end_idx + continuity_idx * DIMENSION;
 
-        // Coefficients for propagating the starting node to the end of the
-        // segment using a zero-order-hold assumption
-        Eigen::MatrixXd start_segment_propagation_coefficients;
-        start_segment_propagation_coefficients.resize(DIMENSION, num_parameters_per_segment);
-        start_segment_propagation_coefficients.fill(0);
-        for(size_t derivative_idx = continuity_idx; derivative_idx <= POLYNOMIAL_SIZE; ++derivative_idx) {
-            start_segment_propagation_coefficients.block<DIMENSION,1>(0,derivative_idx) = 
-              Eigen::Matrix<double, DIMENSION, 1>::Ones() 
-              * std::pow(delta_t, derivative_idx - continuity_idx) 
-              / factorial(derivative_idx - continuity_idx);
+      for(size_t dim = 0; dim < DIMENSION; ++dim) {
+
+        // Final segment is only constrained by PVA
+        const size_t num_continuity_constraints = 
+          (segment_idx == num_segments - 1) ? 3 : CONTINUITY_ORDER;
+
+        // Continuity index is the index of the derivative whose continuity is
+        // begin enforced
+        for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
+          // Propagate the current node
+          Eigen::MatrixXd segment_propagation_coefficients;
+          segment_propagation_coefficients.resize(1, num_parameters_per_dimension);
+          segment_propagation_coefficients.fill(0);
+          segment_propagation_coefficients 
+            = CoefficientVector(POLYNOMIAL_ORDER, continuity_idx, delta_t).transpose();
+
+          // Minus the next node
+          Eigen::MatrixXd segment_terminal_coefficients;
+          segment_terminal_coefficients.resize(1, num_parameters_per_dimension);
+          segment_terminal_coefficients.fill(0);
+          segment_terminal_coefficients(0,continuity_idx) = -1;
+
+          size_t this_parameter_idx = this_segment_parameter_idx + dim * num_parameters_per_dimension;
+          size_t next_parameter_idx = next_segment_parameter_idx + dim * num_parameters_per_dimension;
+
+          dense_constraint_matrix.block<1,num_parameters_per_dimension>
+            (constraint_idx, this_parameter_idx) = segment_propagation_coefficients;
+          dense_constraint_matrix.block<1,num_parameters_per_dimension>
+            (constraint_idx, next_parameter_idx) = segment_terminal_coefficients;
+
+          constraint_idx += 1;
         }
-
-        // Negative of the end node, requiring the propagation and the end to
-        // be the same
-        Eigen::MatrixXd end_segment_propagation_coefficients;
-        end_segment_propagation_coefficients.resize(DIMENSION, num_parameters_per_segment);
-        end_segment_propagation_coefficients.fill(0);
-        end_segment_propagation_coefficients.block<DIMENSION,1>(0,continuity_idx) = 
-          Eigen::Matrix<double, DIMENSION, 1>::Ones() * -1;
-
-        dense_constraint_matrix.block<DIMENSION,num_parameters_per_segment>
-          (constraint_idx, segment_start_idx) = start_segment_propagation_coefficients;
-        dense_constraint_matrix.block<DIMENSION,num_parameters_per_segment>
-          (constraint_idx, segment_end_idx) = end_segment_propagation_coefficients;
-        constraint_idx += DIMENSION;
       }
     }
   }
@@ -264,9 +321,19 @@ void Path2PVA(
   Eigen::MatrixXd dense_quadratic_cost_matrix;
   dense_quadratic_cost_matrix.resize(num_parameters, num_parameters);
   dense_quadratic_cost_matrix.fill(0);
-  for(size_t segment_idx = 0; segment_idx < num_segments; ++segment_idx) {
-    const size_t min_idx = num_parameters_per_segment * segment_idx + DIMENSION*MIN_DERIVATIVE_IDX;
-    dense_quadratic_cost_matrix.block<DIMENSION,DIMENSION>(min_idx, min_idx) = Eigen::Matrix<double, DIMENSION, DIMENSION>::Identity();
+  {
+    const double delta_t = 1.0;
+    const Eigen::MatrixXd quadratic_matrix = QuadraticMatrix(POLYNOMIAL_ORDER, DERIVATIVE_ORDER, delta_t);
+
+    for(size_t segment_idx = 0; segment_idx < num_segments; ++segment_idx) {
+      for(size_t dim = 0; dim < DIMENSION; ++dim) {
+        dense_quadratic_cost_matrix.block(
+            segment_idx*num_parameters_per_segment + dim*num_parameters_per_dimension,
+            segment_idx*num_parameters_per_segment + dim*num_parameters_per_dimension,
+            num_parameters_per_dimension, 
+            num_parameters_per_dimension) = quadratic_matrix;
+      }
+    }
   }
 
   /*
@@ -289,15 +356,7 @@ void Path2PVA(
     lower_mat[row_idx] = lower_bound(row_idx, 0);
     upper_mat[row_idx] = upper_bound(row_idx, 0);
   }
-
-
-  std::cout << dense_quadratic_cost_matrix << std::endl;
-  std::cout << "" << std::endl;
-  std::cout << dense_constraint_matrix << std::endl;
-  std::cout << "" << std::endl;
-  std::cout << lower_bound.transpose() << std::endl;
-  std::cout << upper_bound.transpose() << std::endl;
-
+ 
   /*
    * SOLVER
    */
@@ -321,7 +380,8 @@ void Path2PVA(
 
   // Define Solver settings as default
   osqp_set_default_settings(settings);
-  settings->alpha = 1.0; 
+  settings->warm_start = false;
+  settings->polish = true;
 
   // Setup workspace
   work = osqp_setup(data, settings);
@@ -330,6 +390,11 @@ void Path2PVA(
   osqp_solve(work);
 
   std::cout << work->info->status << std::endl;
+  std::cout << "Run Time: " << work->info->run_time << " s" << std::endl;
+
+  for(size_t solution_idx = 0; solution_idx < num_parameters; ++solution_idx) {
+    std::cout << work->solution->x[solution_idx] << std::endl;
+  }
 
   // Cleanup
   osqp_cleanup(work);
@@ -343,38 +408,79 @@ void Path2PVA(
 
 
 int main() { 
-  // std::vector<PathConstraint> pos_constraint;
-  // pos_constraint.emplace_back(0, Eigen::Matrix<double, 4, 1>(0,0,0,0));
-  // pos_constraint.emplace_back(1, Eigen::Matrix<double, 4, 1>(1,0,0,0));
-
-  // std::vector<PathConstraint> vel_constraint;
-  // vel_constraint.emplace_back(0, Eigen::Matrix<double, 4, 1>(1,0,0,0));
-  // vel_constraint.emplace_back(1, Eigen::Matrix<double, 4, 1>(0,0,0,0));
-
-  // std::vector<PathConstraint> acc_constraint;
-  // acc_constraint.emplace_back(0, Eigen::Matrix<double, 4, 1>(0,0,0,0));
-  // acc_constraint.emplace_back(1, Eigen::Matrix<double, 4, 1>(0,0,0,0));
-
-  // std::vector<double> times = {0, 0.5};
-  // Path2PVA(pos_constraint, vel_constraint, acc_constraint, times);
-
   std::vector<PathConstraint<1>> pos_constraint;
-  pos_constraint.emplace_back(0, Eigen::Matrix<double, 1, 1>(0));
-  pos_constraint.emplace_back(1, Eigen::Matrix<double, 1, 1>(1));
-  pos_constraint.emplace_back(2, Eigen::Matrix<double, 1, 1>(2));
-
   std::vector<PathConstraint<1>> vel_constraint;
-  vel_constraint.emplace_back(0, Eigen::Matrix<double, 1, 1>(1));
-  vel_constraint.emplace_back(1, Eigen::Matrix<double, 1, 1>(0));
-  vel_constraint.emplace_back(2, Eigen::Matrix<double, 1, 1>(1));
-
   std::vector<PathConstraint<1>> acc_constraint;
+  std::vector<double> times;
+
+  pos_constraint.emplace_back(0, Eigen::Matrix<double, 1, 1>(0));
+  vel_constraint.emplace_back(0, Eigen::Matrix<double, 1, 1>(0));
   acc_constraint.emplace_back(0, Eigen::Matrix<double, 1, 1>(0));
+
+  pos_constraint.emplace_back(1, Eigen::Matrix<double, 1, 1>(1));
+  vel_constraint.emplace_back(1, Eigen::Matrix<double, 1, 1>(0));
   acc_constraint.emplace_back(1, Eigen::Matrix<double, 1, 1>(0));
+
+  pos_constraint.emplace_back(2, Eigen::Matrix<double, 1, 1>(2));
+  vel_constraint.emplace_back(2, Eigen::Matrix<double, 1, 1>(0));
   acc_constraint.emplace_back(2, Eigen::Matrix<double, 1, 1>(0));
 
-  std::vector<double> times = {0, 0.5, 1};
+  times = {0,1,2};
+
   Path2PVA<1>(pos_constraint, vel_constraint, acc_constraint, times);
+
+  // std::vector<PathConstraint<2>> pos_constraint;
+  // std::vector<PathConstraint<2>> vel_constraint;
+  // std::vector<PathConstraint<2>> acc_constraint;
+
+  // pos_constraint.emplace_back(0, Eigen::Matrix<double, 2, 1>(0,0));
+  // vel_constraint.emplace_back(0, Eigen::Matrix<double, 2, 1>(0,0));
+  // acc_constraint.emplace_back(0, Eigen::Matrix<double, 2, 1>(0,0));
+
+  // pos_constraint.emplace_back(1, Eigen::Matrix<double, 2, 1>(1,1));
+  // vel_constraint.emplace_back(1, Eigen::Matrix<double, 2, 1>(0,0));
+  // acc_constraint.emplace_back(1, Eigen::Matrix<double, 2, 1>(0,0));
+
+  // std::vector<double> times = {0, 0.5};
+  // Path2PVA<2>(pos_constraint, vel_constraint, acc_constraint, times);
+
+  // std::vector<PathConstraint<3>> pos_constraint;
+  // std::vector<PathConstraint<3>> vel_constraint;
+  // std::vector<PathConstraint<3>> acc_constraint;
+  // std::vector<double> times;
+
+  // // pos_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(0,0,0));
+  // // vel_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(0,0,0));
+  // // acc_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(0,0,0));
+
+  // // pos_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(1,1,1));
+  // // vel_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(0,0,0));
+  // // acc_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(0,0,0));
+
+  // for(size_t idx = 0; idx < 100; ++idx) {
+  //   pos_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(idx, idx*idx, 3.0*idx));
+  //   vel_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(0,0,0));
+  //   acc_constraint.emplace_back(2, Eigen::Matrix<double, 3, 1>(0,0,0));
+  //   times.emplace_back(idx);
+  // }
+  // Path2PVA<3>(pos_constraint, vel_constraint, acc_constraint, times);
 
   return EXIT_SUCCESS;
 }
+
+// void test_order {
+//   std::vector<PathConstraint<3>> pos_constraint;
+//   std::vector<PathConstraint<3>> vel_constraint;
+//   std::vector<PathConstraint<3>> acc_constraint;
+// 
+//   pos_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(1,4,7));
+//   vel_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(2,5,8));
+//   acc_constraint.emplace_back(0, Eigen::Matrix<double, 3, 1>(3,6,9));
+// 
+//   pos_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(10,13,16));
+//   vel_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(11,14,17));
+//   acc_constraint.emplace_back(1, Eigen::Matrix<double, 3, 1>(12,15,18));
+// 
+//   std::vector<double> times = {0, 0.5};
+//   Path2PVA<3>(pos_constraint, vel_constraint, acc_constraint, times);
+// }

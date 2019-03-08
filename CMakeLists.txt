@@ -12,7 +12,6 @@ if(NOT CMAKE_BUILD_TYPE)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# add_subdirectory(lib)
 add_subdirectory(src)
 # add_subdirectory(examples)
 # add_subdirectory(test) 
