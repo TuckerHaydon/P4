@@ -1,15 +1,16 @@
 // Author: Tucker Haydon
 
-// #include "OsqpEigen/OsqpEigen.h"
-
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <osqp.h>
+#include "gnuplot-iostream.h"
 
 #include <iostream>
 #include <cstdlib>
 #include <vector>
 #include <queue>
+#include <utility>
+
 
 template <size_t T>
 struct PathConstraint {
@@ -392,8 +393,22 @@ void Path2PVA(
   std::cout << work->info->status << std::endl;
   std::cout << "Run Time: " << work->info->run_time << " s" << std::endl;
 
-  for(size_t solution_idx = 0; solution_idx < num_parameters; ++solution_idx) {
-    std::cout << work->solution->x[solution_idx] << std::endl;
+  // Extract solution
+  std::vector<Eigen::Matrix<c_float, Eigen::Dynamic, Eigen::Dynamic>> solution(num_segments);
+  for(size_t segment_idx = 0; segment_idx < num_segments; ++segment_idx) {
+    Eigen::MatrixXd segment_solution;
+    segment_solution.resize(num_parameters_per_dimension, DIMENSION);
+    for(size_t dim = 0; dim < DIMENSION; ++dim) {
+      for(size_t polynomial_idx = 0; polynomial_idx < num_parameters_per_dimension; ++polynomial_idx) {
+        size_t idx = segment_idx * num_parameters_per_segment + dim * num_parameters_per_dimension + polynomial_idx;
+        segment_solution(polynomial_idx, dim) = work->solution->x[idx];
+      }
+    }
+    solution[segment_idx] = segment_solution;
+  }
+
+  for(const auto& el: solution) {
+    std::cout << el << std::endl << std::endl;
   }
 
   // Cleanup
@@ -402,6 +417,71 @@ void Path2PVA(
   c_free(data->P);
   c_free(data);
   c_free(settings);
+
+  // Sampling
+  const size_t num_samples = 50;
+  const size_t num_derivatives = 3;
+
+  std::vector<double> time_samples(num_samples);
+  std::vector<Eigen::Matrix<double, DIMENSION, 1>> position_samples(num_samples);
+  std::vector<Eigen::Matrix<double, DIMENSION, 1>> velocity_samples(num_samples);
+  std::vector<Eigen::Matrix<double, DIMENSION, 1>> acceleration_samples(num_samples);
+
+  for(size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
+    time_samples[sample_idx] = 1.0 * sample_idx / (num_samples - 1);
+
+    for(size_t derivative_idx = 0; derivative_idx < num_derivatives; ++derivative_idx) {
+      Eigen::MatrixXd coefficients;
+      coefficients.resize(POLYNOMIAL_ORDER + 1,1);
+      coefficients = CoefficientVector(POLYNOMIAL_ORDER, derivative_idx, time_samples[sample_idx]);
+
+      Eigen::MatrixXd sample;
+      sample.resize(DIMENSION,1);
+      sample = coefficients.transpose() * solution[0];
+      switch(derivative_idx) {
+      case 0:
+        position_samples[sample_idx] = sample;
+      case 1:
+        velocity_samples[sample_idx] = sample;
+      case 2:
+        acceleration_samples[sample_idx] = sample;
+      }
+
+    }
+  }
+
+  // Plotting
+  std::vector<std::pair<double, double>> position_pairs(num_samples);
+  std::vector<std::pair<double, double>> velocity_pairs(num_samples);
+  std::vector<std::pair<double, double>> acceleration_pairs(num_samples);
+  for(size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
+    double t = time_samples[sample_idx];
+    double pos = position_samples[sample_idx](0,0);
+    double vel = velocity_samples[sample_idx](0,0);
+    double acc = acceleration_samples[sample_idx](0,0);
+
+    position_pairs[sample_idx].first = t;
+    position_pairs[sample_idx].second = pos;
+    
+    velocity_pairs[sample_idx].first = t;
+    velocity_pairs[sample_idx].second = vel;
+
+    acceleration_pairs[sample_idx].first = t;
+    acceleration_pairs[sample_idx].second = acc;
+  }
+
+  {
+    Gnuplot gp;
+    gp << "plot " << gp.file1d(position_pairs) << " with lines" << std::endl;
+  }
+  {
+    Gnuplot gp;
+    gp << "plot " << gp.file1d(velocity_pairs) << " with lines" << std::endl;
+  }
+  {
+    Gnuplot gp;
+    gp << "plot " << gp.file1d(acceleration_pairs) << " with lines" << std::endl;
+  }
 
   return;
 }

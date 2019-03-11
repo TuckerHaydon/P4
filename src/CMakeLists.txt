@@ -3,8 +3,12 @@ cmake_minimum_required(VERSION 2.8.3)
 set(TARGET min_snap)
 
 find_package(osqp REQUIRED)
-find_package(OsqpEigen)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Boost 1.40.0 COMPONENTS filesystem system iostreams REQUIRED)
 
-add_executable(${TARGET} main.cc)
-target_link_libraries(${TARGET} PRIVATE osqp::osqpstatic OsqpEigen::OsqpEigen Eigen3::Eigen ${CMAKE_DL_LIBS})
+add_executable(${TARGET} main.cc gnuplot-iostream.h)
+target_link_libraries(${TARGET} PRIVATE 
+  osqp::osqpstatic 
+  Eigen3::Eigen
+  ${Boost_LIBRARIES} 
+  ${CMAKE_DL_LIBS})
