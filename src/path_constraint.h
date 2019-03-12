@@ -3,23 +3,25 @@
 #pragma once
 
 namespace mediation_layer {
-  // Constrains one dimension for one node in the path
-  // Example: constrain the x-position of the 5th node to be 5
   struct PathConstraint {
-    const size_t index;
-    const size_t dimension;
+    const size_t node_idx;
+    const size_t dimension_idx;
+    const size_t derivative_idx;
     const double value;
   
     PathConstraint(
-      const size_t index_,
-      const size_t dimension_,
+      const size_t dimension_idx_,
+      const size_t node_idx_,
+      const size_t derivative_idx_,
       const double value_)
-      : index(index_),
-        dimension(dimension_),
+      : dimension_idx(dimension_idx_),
+        node_idx(node_idx_),
+        derivative_idx(derivative_idx_),
         value(value_) {}
   };
+
+  using EqualityBound = PathConstraint;
+  using LowerBound = PathConstraint;
+  using UpperBound = PathConstraint;
   
-  struct LowerBound : public PathConstraint {};
-  struct UpperBound : public PathConstraint {};
-  struct EqualityBound : public PathConstraint {};
 };

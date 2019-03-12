@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-set(TARGET min_snap)
+set(TARGET lib_polynomial)
 
 find_package(osqp REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Boost 1.40.0 COMPONENTS filesystem system iostreams REQUIRED)
 
-add_executable(${TARGET} main.cc gnuplot-iostream.h)
+add_library(${TARGET} polynomial_solver.cc polynomial_solver.h)
 target_link_libraries(${TARGET} PRIVATE 
   osqp::osqpstatic 
   Eigen3::Eigen
