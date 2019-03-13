@@ -9,3 +9,10 @@ target_link_libraries(3D
   Eigen3::Eigen
 )
 
+add_executable(speed speed.cc)
+target_include_directories(speed PUBLIC ../src)
+target_link_libraries(speed 
+  lib_polynomial
+  Eigen3::Eigen
+)
+
