@@ -59,8 +59,8 @@ make
 - Parallelized QP solver (one for each dimension)
 
 ## Credits
--[OSQP](https://github.com/oxfordcontrol/osqp)
--[Eigen](http://eigen.tuxfamily.org)
+- [OSQP](https://github.com/oxfordcontrol/osqp)
+- [Eigen](http://eigen.tuxfamily.org)
 - [gnuplot](http://www.gnuplot.info)
 - [gnuplot-iostream](http://stahlke.org/dan/gnuplot-iostream/)
 
