@@ -263,7 +263,7 @@ namespace mediation_layer {
   }
 
 
-  PolynomialSolver::Solution PolynomialSolver::Run(
+  PolynomialPath PolynomialSolver::Run(
       const std::vector<double>& times,
       const std::vector<EqualityBound>& explicit_equality_bounds,
       const std::vector<UpperBound>& explicit_upper_bounds,
@@ -425,7 +425,7 @@ namespace mediation_layer {
     /*
      * SOLUTION
      */
-    Solution solution;
+    PolynomialPath solution;
     solution.coefficients.reserve(info.num_dimensions);
     for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
       // Allocate dynamic matrix

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "path_constraint.h"
+#include "polynomial_path.h"
 
 namespace mediation_layer {
   /* Class for solving piecewise polynomial fitting & minimization problems.
@@ -54,20 +55,10 @@ namespace mediation_layer {
         void Check();
       };
 
-      struct Solution {
-        // Vector containing the polynomial coefficient solutions for each
-        // dimension. The rows of the vector indicate the dimension, each column
-        // of the matrix contains the coefficients for each node, and the row
-        // number specifies the coefficient index.
-        std::vector<Eigen::MatrixXd> coefficients;
-
-        Solution() {};
-      };
-
       PolynomialSolver(const Options& options = Options())
         : options_(options) {}
   
-      Solution Run(
+      PolynomialPath Run(
           const std::vector<double>& times,
           const std::vector<EqualityBound>& equality_bounds,
           const std::vector<UpperBound>& upper_bounds,
