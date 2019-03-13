@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   solver_options.num_dimensions = 3;     // 3D
   solver_options.polynomial_order = 7;   // Fit an 7th-order polynomial
   solver_options.continuity_order = 3;   // Require continuity to the 4th order
-  solver_options.derivative_order = 1;   // Minimize the 4th order (snap)
+  solver_options.derivative_order = 2;   // Minimize the 4th order (snap)
   solver_options.polish = true;          // Polish the solution
 
   PolynomialSolver solver(solver_options);

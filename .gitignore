@@ -1,3 +1,11 @@
 *.swp
 build
 lib
+*.pdf
+*.aux 
+*.bbl 
+*.log 
+*.blg 
+*.dvi 
+*.ps 
+*.out

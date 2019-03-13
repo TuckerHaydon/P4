@@ -17,7 +17,7 @@ namespace mediation_layer {
    *   ...
    *
    * finds the minimum of the following cost function:
-   *   c^T H c
+   *   x^T P x
    *
    * subject to continuity and path constraints.
    *
@@ -25,9 +25,9 @@ namespace mediation_layer {
    * chosen to solve this problem. OSQP can efficiently solve sparse QP
    * problems. OSQP requires the problem to be formulated as:
    *   argmin
-   *     c^T H c
+   *     x^T P x
    *   subject to
-   *     l <= Ac <= u
+   *     l <= Ax <= u
    *
    * Notes: 
    * 1) polynomial_order must be 3 or more orders greater than derivative_order
@@ -37,6 +37,7 @@ namespace mediation_layer {
    */
   class PolynomialSolver {
     public:
+      // Options to configure the solver with
       struct Options {
         // Standard options
         size_t num_dimensions = 0;
@@ -48,6 +49,7 @@ namespace mediation_layer {
         bool polish = false;
 
         // Multi-threading options
+        // Currently unused. 
         bool multithread = false;
         size_t num_threads = 0;
   

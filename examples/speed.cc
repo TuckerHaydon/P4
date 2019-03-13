@@ -3,7 +3,6 @@
 #include <cstdlib>
 
 #include <Eigen/Dense>
-#include "gnuplot-iostream.h"
 
 #include "polynomial_solver.h"
 #include "polynomial_sampler.h"
@@ -12,7 +11,7 @@ using namespace mediation_layer;
 
 int main(int argc, char** argv) {
 
-  const size_t num_nodes = 1000;
+  const size_t num_nodes = 100;
   std::vector<double> times = {0};
 
   // Equality bounds paramater order is:

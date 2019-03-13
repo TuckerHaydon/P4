@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 2.8.3)
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Boost 1.40.0 COMPONENTS filesystem system iostreams REQUIRED)
 
-add_executable(3D 3D.cc)
+add_executable(3D 3D.cc gnuplot-iostream.h)
 target_include_directories(3D PUBLIC ../src)
 target_link_libraries(3D 
   lib_polynomial
+  ${Boost_LIBRARIES} 
   Eigen3::Eigen
 )
 

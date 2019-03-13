@@ -4,7 +4,6 @@ set(TARGET lib_polynomial)
 
 find_package(osqp REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(Boost 1.40.0 COMPONENTS filesystem system iostreams REQUIRED)
 
 add_library(${TARGET} 
   polynomial_solver.cc 
@@ -16,5 +15,4 @@ add_library(${TARGET}
 target_link_libraries(${TARGET} PRIVATE 
   osqp::osqpstatic 
   Eigen3::Eigen
-  ${Boost_LIBRARIES} 
   ${CMAKE_DL_LIBS})

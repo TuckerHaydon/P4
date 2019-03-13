@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 
 namespace mediation_layer {
+  // Encapsulates information about the piecewise polynomial solution.
   struct PolynomialPath {
     // Vector containing the polynomial coefficient solutions for each
     // dimension. The rows of the vector indicate the dimension, each column
