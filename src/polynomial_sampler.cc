@@ -61,7 +61,7 @@ namespace mediation_layer {
 
     // Prepare the sample matrix
     Eigen::MatrixXd samples;
-    samples.resize(num_dimensions, num_samples);
+    samples.resize(num_dimensions + 1, num_samples);
     samples.fill(0);
 
     size_t node_idx = 0;
@@ -69,11 +69,14 @@ namespace mediation_layer {
     double start_time = times.front();
 
     for(size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
-      const double time = start_time + sample_idx * this->options_.frequency;
+      const double time = start_time + sample_idx / this->options_.frequency;
 
       if(time > times[node_idx + 1]) {
         node_idx++;
       }
+
+      // Push time
+      samples(0, sample_idx) = time;
 
       for(size_t dimension_idx = 0; dimension_idx < num_dimensions; ++dimension_idx) {
         const double alpha = 1.0 / (times[node_idx+1] - times[node_idx]);
@@ -83,7 +86,8 @@ namespace mediation_layer {
         const Eigen::MatrixXd scale_mat = ScaleMatrix(polynomial_order, alpha);
         const Eigen::MatrixXd time_vector = TimeVector(polynomial_order, 0, time - times[node_idx]);
 
-        samples(dimension_idx, sample_idx) = (polynomial_coefficients * scale_mat * time_vector)(0,0);
+        // Time is the first dimension. Shift the index down.
+        samples(dimension_idx + 1, sample_idx) = (polynomial_coefficients.transpose() * scale_mat * time_vector)(0,0);
       }
     }
 
