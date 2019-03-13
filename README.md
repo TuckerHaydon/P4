@@ -12,7 +12,9 @@ as a quadratic programming problem and solved with
 while minimizing the squared norm of a specified derivative and adhering to
 specified, derivative-based path constraints. This approach follows the
 minimum snap problem formulation and solution published by [Mellinger and
-Kumar](https://ieeexplore.ieee.org/abstract/document/5980409).
+Kumar](https://ieeexplore.ieee.org/abstract/document/5980409). The theory behind
+the polynomial solver can be found in the [doc/tex](doc/tex) directory. Make the
+document by following the instructions below.
 
 Examples are found in the [examples](examples/) directory.
 
@@ -25,6 +27,7 @@ Examples are found in the [examples](examples/) directory.
 sudo apt install libboost-all-dev gnuplot
 ```
 
+
 ## Build
 ```bash
 mkdir build && cd build
@@ -32,12 +35,26 @@ cmake ..
 make -j4
 ```
 
+
 ## Run
-```
+```bash
 cd build/examples
 ./${EXECUTABLE_OF_CHOICE}
 ```
 
+
+## Documentation
+```bash
+cd doc/tex
+make
+# open main.pdf
+```
+
+
 ## TODO
 - Corridor Constraints
 - Parallelized QP solver (one for each dimension)
+
+## Contact
+Tucker Haydon (thaydon@utexas.edu)
+

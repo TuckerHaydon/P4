@@ -4,10 +4,16 @@
 
 namespace mediation_layer {
   namespace {
+    // Computes n!
     size_t factorial(size_t n) {
       return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
     }
 
+    // Computes a 'time vector'. A time vector has the form: 
+    //   [1/0! t^0, 1/1! t^1, 1/2! t^2, ...]
+    // or a specific derivative thereof, e.g. the first derivative
+    //   [0,        1/0! t^0, 1/1! t^1, ...]
+    // See the theory documentation for a deeper explanation.
     Eigen::MatrixXd TimeVector(
         const size_t polynomial_order, 
         const size_t derivative_order, 
@@ -34,6 +40,12 @@ namespace mediation_layer {
       return coefficient_vec;
     }
 
+    // Computes the scaling matrix. The scaling matrix is required because the
+    // polynomial solver assumes unit time for each polynomial segment. In
+    // truth, the time between each segment may differ, so a temporal scaling is
+    // required. The scaling matrix is square, with increasing powers of the
+    // scale along the diagonal. See the theory documentation for an
+    // explanation.
     Eigen::MatrixXd ScaleMatrix(
         const size_t polynomial_order,
         const double alpha) {
@@ -49,10 +61,12 @@ namespace mediation_layer {
     }
   }
 
+  // Sample a polynomial path solution
   Eigen::MatrixXd PolynomialSampler::Run(
       const std::vector<double>& times,
       const PolynomialPath& path) {
 
+    // Helper constants
     const size_t num_dimensions = path.coefficients.size();
     const size_t num_nodes = path.coefficients[0].cols();
     const size_t polynomial_order = path.coefficients[0].rows() - 1;

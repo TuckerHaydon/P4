@@ -14,6 +14,7 @@ namespace mediation_layer {
     public:
       // Options to configure the sampler with
       struct Options {
+        // Frequency of samples per second
         double frequency = 20;
 
         Options(){}
