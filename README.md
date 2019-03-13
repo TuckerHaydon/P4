@@ -1,4 +1,4 @@
-# MinSnap
+# Piecewise Polynomial Path Planner (P4)
 
 ## Description
 Generalized piecewise polynomial solver. Given a set of waypoints and associated
@@ -57,6 +57,12 @@ make
 ## TODO
 - Corridor Constraints
 - Parallelized QP solver (one for each dimension)
+
+## Credits
+-[OSQP](https://github.com/oxfordcontrol/osqp)
+-[Eigen](http://eigen.tuxfamily.org)
+- [gnuplot](http://www.gnuplot.info)
+- [gnuplot-iostream](http://stahlke.org/dan/gnuplot-iostream/)
 
 ## Contact
 Tucker Haydon (thaydon@utexas.edu)

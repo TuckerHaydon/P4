@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-set(TARGET lib_polynomial)
+set(TARGET lib_p4)
 
 find_package(osqp REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
