@@ -44,6 +44,9 @@ cd build/examples
 
 
 ## Documentation
+The theoretical documentation is written in LaTex. Latex must be installed
+before building the pdf.
+
 ```bash
 cd doc/tex
 make

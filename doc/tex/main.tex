@@ -1,0 +1,81 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\title{Polynomial Path Planner (P3)}
+\author{Tucker Haydon}
+\date{Spring 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This package is a C++ implementation of a piecewise-polynomial path-planner.
+
+\section{Polynomial Theory}
+\subsection{Problem Statement}
+Given a set of $m$, $k$-dimensional waypoints 
+%
+\begin{equation}
+  \mathbf{W} = 
+  \begin{bmatrix}
+    \vec{w}_{0} & \vec{w}_{1} & \vec{w}_{2} & \hdots & \vec{w}_{m}
+  \end{bmatrix}
+\end{equation}
+%
+and a set of times to arrive at these waypoints 
+\begin{equation}
+  \vec{T} = 
+  \begin{bmatrix}
+    t_{0} & t_{1} & t_{2} & \hdots & t_{m}
+  \end{bmatrix}
+\end{equation}
+%
+construct a set of $N$th-order piecewise polynomials that smoothly connect these waypoints
+%
+\begin{equation}
+  \vec{p}(t) = 
+  \begin{cases}
+    \sum_{n=0}^{N} p_{0,n} \cdot (\frac{1}{n!} t^{n}) & t_{0} \leq t < t_{1} \\ 
+    \sum_{n=0}^{N} p_{1,n} \cdot (\frac{1}{n!} t^{n}) & t_{1} \leq t < t_{2} \\ 
+    \vdots \\
+    \sum_{n=0}^{N} p_{m,n} \cdot (\frac{1}{n!} t^{n}) & t_{m-1} \leq t < t_{m}
+  \end{cases}
+\end{equation}
+%
+while minimizing the squared norm of the $r$th derivative
+%
+\begin{equation}
+  \min
+  \int_{t_{0}}^{t_{m}} \frac{d^{r}}{dt^{r}}|| \vec{p}(t) ||^{2} dt
+\end{equation}
+%
+This problem construction and the following solution follow those of Mellinger
+and Kumar \cite{mellinger2011minimum}.
+
+\subsection{Quadratic Programming}
+The problem of finding these piecewise polynomials can be cast as a quadratic
+programming problem:
+%
+\begin{equation}
+  \begin{split}
+    \min_{\vec{x}} \quad& \frac{1}{2} \vec{x}^T \mathbf{P} \vec{x}  \\
+    \text{s.t.} \quad& \vec{l} \leq \mathbf{A} \vec{x} \leq \vec{u}
+  \end{split}
+\end{equation}
+%
+\href{https://osqp.org}{OSQP} is used to solve the QP problem \cite{osqp}.
+
+\section{Usage Notes}
+\begin{enumerate}
+  \item The polynomial order must be greater than 1.
+  \item The position, velocity, and acceleration for the initial node must all
+    be specified. 
+\end{enumerate}
+
+\bibliography{main}
+\bibliographystyle{IEEEtran}
+
+\end{document}
