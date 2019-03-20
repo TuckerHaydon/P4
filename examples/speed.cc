@@ -11,7 +11,7 @@ using namespace mediation_layer;
 
 int main(int argc, char** argv) {
 
-  const size_t num_nodes = 100;
+  const size_t num_nodes = 10000;
   std::vector<double> times = {0};
 
   // Equality bounds paramater order is:

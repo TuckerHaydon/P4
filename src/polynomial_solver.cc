@@ -109,7 +109,7 @@ namespace mediation_layer {
         const std::vector<UpperBound>& explicit_upper_bounds,
         Eigen::MatrixXd& lower_bound_vec, 
         Eigen::MatrixXd& upper_bound_vec,
-        Eigen::MatrixXd& dense_constraint_matrix
+        std::vector<Eigen::Triplet<double>>& constraint_triplets
         ) {
       size_t constraint_idx = 0;
       for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) { 
@@ -134,7 +134,7 @@ namespace mediation_layer {
                   + derivative_idx 
                   + info.num_params_per_node_per_dim * node_idx
                   + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
-                dense_constraint_matrix(constraint_idx, parameter_idx) = 1;
+                constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
 
                 constraint_idx++;
               }
@@ -175,12 +175,17 @@ namespace mediation_layer {
                 // Get to the right node
                 + info.num_params_per_node_per_dim * (node_idx + 1);
 
-              dense_constraint_matrix.block
-                (constraint_idx, current_segment_idx, 1, info.num_params_per_segment_per_dim) 
-                = segment_propagation_coefficients;
-              dense_constraint_matrix.block
-                (constraint_idx, next_segment_idx, 1, info.num_params_per_segment_per_dim) 
-                = segment_terminal_coefficients;
+              for(size_t param_idx = 0; param_idx < info.num_params_per_segment_per_dim; ++param_idx) {
+                constraint_triplets.emplace_back(
+                    constraint_idx, 
+                    current_segment_idx + param_idx, 
+                    segment_propagation_coefficients(0, param_idx));
+                // TODO: Just insert one terminal constraint
+                constraint_triplets.emplace_back(
+                    constraint_idx, 
+                    next_segment_idx + param_idx, 
+                    segment_terminal_coefficients(0, param_idx));
+              }
 
               constraint_idx++;
             }
@@ -191,7 +196,7 @@ namespace mediation_layer {
 
     void SetQuadraticCost(
         const Info& info,
-        Eigen::MatrixXd& dense_quadratic_matrix) {
+        std::vector<Eigen::Triplet<double>>& quadratic_triplets) {
       const double delta_t = 1.0;
       const Eigen::MatrixXd quadratic_matrix = QuadraticMatrix(info.polynomial_order, info.derivative_order, delta_t);
 
@@ -203,22 +208,24 @@ namespace mediation_layer {
             + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
             // Get to the right node
             + info.num_params_per_node_per_dim * node_idx;
-          dense_quadratic_matrix.block(
-              parameter_idx,
-              parameter_idx,
-              info.num_params_per_node_per_dim, 
-              info.num_params_per_node_per_dim) = quadratic_matrix;
+          for(size_t row = 0; row < info.num_params_per_node_per_dim; ++row) {
+            for(size_t col = 0; col < info.num_params_per_node_per_dim; ++col) { 
+              quadratic_triplets.emplace_back(
+                  row + parameter_idx, 
+                  col + parameter_idx, 
+                  quadratic_matrix(row,col)
+                  );
+            }
+          }
         }
       }
     }
 
-    // Converts an en eigen dense matrix into an OSQP sparse matrix
+    // Converts an en eigen sparse matrix into an OSQP sparse matrix
     // Reference: https://github.com/robotology/osqp-eigen
     void Eigen2OSQP(
-        const Eigen::MatrixXd& eigen_dense_mat,
+        const Eigen::SparseMatrix<double> eigen_sparse_mat,
         csc*& osqp_mat) {
-      const Eigen::SparseMatrix<double> eigen_sparse_mat 
-        = eigen_dense_mat.sparseView(1, 1e-20);
 
       // get number of row, columns and nonZeros from Eigen SparseMatrix
       c_int rows   = eigen_sparse_mat.rows();
@@ -328,10 +335,7 @@ namespace mediation_layer {
     lower_bound_vec.resize(info.num_constraints, 1);
     upper_bound_vec.resize(info.num_constraints, 1);
 
-    Eigen::MatrixXd dense_constraint_matrix;
-    dense_constraint_matrix.resize(info.num_constraints, info.total_num_params);
-    dense_constraint_matrix.fill(0);
-
+    std::vector<Eigen::Triplet<double>> constraint_triplets;
     SetConstraints(
         info, 
         explicit_equality_bounds,
@@ -339,36 +343,29 @@ namespace mediation_layer {
         explicit_upper_bounds,
         lower_bound_vec, 
         upper_bound_vec, 
-        dense_constraint_matrix);
+        constraint_triplets);
+
+    // Triplets to sparse mat
+    Eigen::SparseMatrix<double> sparse_constraint_mat(
+        info.num_constraints, 
+        info.total_num_params);
+    sparse_constraint_mat.setFromTriplets(
+        constraint_triplets.begin(), 
+        constraint_triplets.end());
 
     /*
      * QUADRATIC MATRIX
      */
-    Eigen::MatrixXd dense_quadratic_matrix;
-    dense_quadratic_matrix.resize(info.total_num_params, info.total_num_params);
-    dense_quadratic_matrix.fill(0);
-    SetQuadraticCost(info, dense_quadratic_matrix);
+    std::vector<Eigen::Triplet<double>> quadratic_triplets;
+    SetQuadraticCost(info, quadratic_triplets);
 
-    // std::cout << dense_constraint_matrix.block(0,0,info.num_constraints,6) << std::endl;
-    // std::cout << "" << std::endl;
-    // std::cout << dense_constraint_matrix.block(0,6,info.num_constraints,6) << std::endl;
-    // std::cout << "" << std::endl;
-    // std::cout << dense_constraint_matrix.block(0,12,info.num_constraints,6) << std::endl;
-    // std::cout << "" << std::endl;
-    // std::cout << dense_constraint_matrix.block(0,18,info.num_constraints,6) << std::endl;
-    // std::cout << "" << std::endl;
-    // std::cout << dense_constraint_matrix << std::endl;
-    // std::cout << "" << std::endl;
-    // std::cout << lower_bound_vec.transpose() << std::endl;
-    // std::cout << upper_bound_vec.transpose() << std::endl;
-    // for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
-    //   std::cout << dense_quadratic_matrix.block(
-    //       info.num_params_per_node_per_dim * info.num_nodes * dimension_idx,
-    //       info.num_params_per_node_per_dim * info.num_nodes * dimension_idx,
-    //       info.num_params_per_node_per_dim * info.num_nodes, 
-    //       info.num_params_per_node_per_dim * info.num_nodes) 
-    //     << std::endl << std::endl;
-    // }
+    // Triplets to sparse mat
+    Eigen::SparseMatrix<double> sparse_quadratic_mat(
+        info.total_num_params, 
+        info.total_num_params);
+    sparse_quadratic_mat.setFromTriplets(
+        quadratic_triplets.begin(), 
+        quadratic_triplets.end());
 
     /*
      * CONVERT EIGEN TO OSQP
@@ -376,8 +373,8 @@ namespace mediation_layer {
     csc* P = nullptr;
     csc* A = nullptr;
 
-    Eigen2OSQP(dense_quadratic_matrix, P);
-    Eigen2OSQP(dense_constraint_matrix, A);
+    Eigen2OSQP(sparse_quadratic_mat, P);
+    Eigen2OSQP(sparse_constraint_mat, A);
 
     c_float q[info.total_num_params];
     for(size_t param_idx = 0; param_idx < info.total_num_params; ++param_idx) {
