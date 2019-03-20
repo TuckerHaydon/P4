@@ -45,6 +45,9 @@ namespace mediation_layer {
         size_t derivative_order = 0;
         size_t continuity_order = 0;
 
+        // Number of intermediate points for segment inequality constraints
+        size_t num_intermediate_points = 10;
+
         // Solver options
         bool polish = false;
 
@@ -62,9 +65,11 @@ namespace mediation_layer {
   
       PolynomialPath Run(
           const std::vector<double>& times,
-          const std::vector<EqualityBound>& equality_bounds,
-          const std::vector<UpperBound>& upper_bounds,
-          const std::vector<LowerBound>& lower_bounds);
+          const std::vector<NodeEqualityBound>& node_equality_bounds,
+          const std::vector<NodeUpperBound>& node_upper_bounds,
+          const std::vector<NodeLowerBound>& node_lower_bounds,
+          const std::vector<SegmentUpperBound>& segment_upper_bounds,
+          const std::vector<SegmentLowerBound>& segment_lower_bounds);
   
     private:
       Options options_;

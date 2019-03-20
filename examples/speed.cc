@@ -19,21 +19,18 @@ int main(int argc, char** argv) {
   // 2) Node index
   // 3) Derivative index
   // 4) Value
-  std::vector<EqualityBound> equality_bounds = {
+  std::vector<NodeEqualityBound> equality_bounds = {
     // The first node must constrain position, velocity, and acceleration
-    EqualityBound(0,0,0,0),
-    EqualityBound(0,0,1,0),
-    EqualityBound(0,0,2,0),
+    NodeEqualityBound(0,0,0,0),
+    NodeEqualityBound(0,0,1,0),
+    NodeEqualityBound(0,0,2,0),
   };
 
   for(size_t node_idx = 1; node_idx < num_nodes; ++node_idx) {
     times.push_back(node_idx);
 
-    equality_bounds.push_back(EqualityBound(0,node_idx,0,node_idx));
+    equality_bounds.push_back(NodeEqualityBound(0,node_idx,0,node_idx));
   }
-
-  const std::vector<LowerBound> lower_bounds = {};
-  const std::vector<UpperBound> upper_bounds = {};
 
   PolynomialSolver::Options solver_options;
   solver_options.num_dimensions = 1;
@@ -44,7 +41,7 @@ int main(int argc, char** argv) {
 
   PolynomialSolver solver(solver_options);
   const PolynomialPath path
-    = solver.Run(times, equality_bounds, upper_bounds, lower_bounds);
+    = solver.Run(times, equality_bounds, {},{},{},{});
 
   return EXIT_SUCCESS;
 }

@@ -35,8 +35,10 @@ namespace mediation_layer {
   };
 
   // Helper types
-  using EqualityBound = PathConstraint;
-  using LowerBound = PathConstraint;
-  using UpperBound = PathConstraint;
+  using NodeEqualityBound = PathConstraint;
+  using NodeLowerBound = PathConstraint;
+  using NodeUpperBound = PathConstraint;
+  using SegmentLowerBound = PathConstraint;
+  using SegmentUpperBound = PathConstraint;
   
 };

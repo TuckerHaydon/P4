@@ -101,12 +101,13 @@ namespace mediation_layer {
 
     // Sets the upper and lower bound vectors for the equality and continuity
     // constraints.
-    // TODO: SFC constraints
     void SetConstraints(
         const Info& info,
-        const std::vector<EqualityBound>& explicit_equality_bounds, 
-        const std::vector<LowerBound>& explicit_lower_bounds,
-        const std::vector<UpperBound>& explicit_upper_bounds,
+        const std::vector<NodeEqualityBound>& explicit_node_equality_bounds, 
+        const std::vector<NodeLowerBound>& explicit_node_lower_bounds,
+        const std::vector<NodeUpperBound>& explicit_node_upper_bounds,
+        const std::vector<SegmentLowerBound>& explicit_segment_lower_bounds,
+        const std::vector<SegmentUpperBound>& explicit_segment_upper_bounds,
         Eigen::MatrixXd& lower_bound_vec, 
         Eigen::MatrixXd& upper_bound_vec,
         std::vector<Eigen::Triplet<double>>& constraint_triplets
@@ -117,7 +118,7 @@ namespace mediation_layer {
           for(size_t derivative_idx = 0; derivative_idx < info.num_params_per_segment_per_dim; ++derivative_idx) {
 
             // Equality Constraints
-            for(const EqualityBound& bound: explicit_equality_bounds) {
+            for(const NodeEqualityBound& bound: explicit_node_equality_bounds) {
               if(
                   false == (bound.node_idx == node_idx) ||
                   false == (bound.dimension_idx == dimension_idx) || 
@@ -139,6 +140,54 @@ namespace mediation_layer {
                 constraint_idx++;
               }
             }
+
+            // Lower Bound Constraints
+            // for(const EqualityBound& bound: explicit_node_equality_bounds) {
+            //   if(
+            //       false == (bound.node_idx == node_idx) ||
+            //       false == (bound.dimension_idx == dimension_idx) || 
+            //       false == (bound.derivative_idx == derivative_idx)) {
+            //     continue;
+            //   }
+            //   else {
+            //     // Bounds
+            //     lower_bound_vec(constraint_idx,0) = bound.value;
+            //     upper_bound_vec(constraint_idx,0) = bound.value;
+
+            //     // Constraints
+            //     size_t parameter_idx = 0 
+            //       + derivative_idx 
+            //       + info.num_params_per_node_per_dim * node_idx
+            //       + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
+            //     constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
+
+            //     constraint_idx++;
+            //   }
+            // }
+
+            // Upper Bound Constraints
+            // for(const EqualityBound& bound: explicit_node_equality_bounds) {
+            //   if(
+            //       false == (bound.node_idx == node_idx) ||
+            //       false == (bound.dimension_idx == dimension_idx) || 
+            //       false == (bound.derivative_idx == derivative_idx)) {
+            //     continue;
+            //   }
+            //   else {
+            //     // Bounds
+            //     lower_bound_vec(constraint_idx,0) = bound.value;
+            //     upper_bound_vec(constraint_idx,0) = bound.value;
+
+            //     // Constraints
+            //     size_t parameter_idx = 0 
+            //       + derivative_idx 
+            //       + info.num_params_per_node_per_dim * node_idx
+            //       + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
+            //     constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
+
+            //     constraint_idx++;
+            //   }
+            // }
           }
 
           // Continuity constraints
@@ -272,9 +321,11 @@ namespace mediation_layer {
 
   PolynomialPath PolynomialSolver::Run(
       const std::vector<double>& times,
-      const std::vector<EqualityBound>& explicit_equality_bounds,
-      const std::vector<UpperBound>& explicit_upper_bounds,
-      const std::vector<LowerBound>& explicit_lower_bounds) {
+      const std::vector<NodeEqualityBound>& explicit_node_equality_bounds,
+      const std::vector<NodeUpperBound>& explicit_node_upper_bounds,
+      const std::vector<NodeLowerBound>& explicit_node_lower_bounds,
+      const std::vector<SegmentUpperBound>& explicit_segment_upper_bounds,
+      const std::vector<SegmentLowerBound>& explicit_segment_lower_bounds) {
 
     this->options_.Check();
 
@@ -316,7 +367,7 @@ namespace mediation_layer {
       + info.num_segments*(info.continuity_order+1)*info.num_dimensions;
 
     // Explicit constraints are provided
-    const size_t num_explicit_constraints = explicit_equality_bounds.size() + explicit_upper_bounds.size() + explicit_lower_bounds.size();
+    const size_t num_explicit_constraints = explicit_node_equality_bounds.size() + explicit_node_upper_bounds.size() + explicit_node_lower_bounds.size();
 
     // Implicit constraints are continuity constraints
     const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
@@ -338,9 +389,11 @@ namespace mediation_layer {
     std::vector<Eigen::Triplet<double>> constraint_triplets;
     SetConstraints(
         info, 
-        explicit_equality_bounds,
-        explicit_lower_bounds,
-        explicit_upper_bounds,
+        explicit_node_equality_bounds,
+        explicit_node_lower_bounds,
+        explicit_node_upper_bounds,
+        explicit_segment_lower_bounds,
+        explicit_segment_upper_bounds,
         lower_bound_vec, 
         upper_bound_vec, 
         constraint_triplets);

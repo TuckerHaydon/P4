@@ -19,36 +19,33 @@ int main(int argc, char** argv) {
   // 2) Node index
   // 3) Derivative index
   // 4) Value
-  const std::vector<EqualityBound> equality_bounds = {
+  const std::vector<NodeEqualityBound> equality_bounds = {
     // The first node must constrain position, velocity, and acceleration
-    EqualityBound(0,0,0,0),
-    EqualityBound(1,0,0,0),
-    EqualityBound(2,0,0,0),
-    EqualityBound(0,0,1,0),
-    EqualityBound(1,0,1,0),
-    EqualityBound(2,0,1,0),
-    EqualityBound(0,0,2,0),
-    EqualityBound(1,0,2,0),
-    EqualityBound(2,0,2,0),
+    NodeEqualityBound(0,0,0,0),
+    NodeEqualityBound(1,0,0,0),
+    NodeEqualityBound(2,0,0,0),
+    NodeEqualityBound(0,0,1,0),
+    NodeEqualityBound(1,0,1,0),
+    NodeEqualityBound(2,0,1,0),
+    NodeEqualityBound(0,0,2,0),
+    NodeEqualityBound(1,0,2,0),
+    NodeEqualityBound(2,0,2,0),
 
     // The second node constrains position
-    EqualityBound(0,1,0,1),
-    EqualityBound(1,1,0,0),
-    EqualityBound(2,1,0,0),
+    NodeEqualityBound(0,1,0,1),
+    NodeEqualityBound(1,1,0,0),
+    NodeEqualityBound(2,1,0,0),
 
     // The third node constrains position
-    EqualityBound(0,2,0,1),
-    EqualityBound(1,2,0,1),
-    EqualityBound(2,2,0,1),
+    NodeEqualityBound(0,2,0,1),
+    NodeEqualityBound(1,2,0,1),
+    NodeEqualityBound(2,2,0,1),
 
     // The fourth node constrains position
-    EqualityBound(0,3,0,0),
-    EqualityBound(1,3,0,0),
-    EqualityBound(2,3,0,0),
+    NodeEqualityBound(0,3,0,0),
+    NodeEqualityBound(1,3,0,0),
+    NodeEqualityBound(2,3,0,0),
   };
-
-  const std::vector<LowerBound> lower_bounds = {};
-  const std::vector<UpperBound> upper_bounds = {};
 
   PolynomialSolver::Options solver_options;
   solver_options.num_dimensions = 3;     // 3D
@@ -59,7 +56,7 @@ int main(int argc, char** argv) {
 
   PolynomialSolver solver(solver_options);
   const PolynomialPath path
-    = solver.Run(times, equality_bounds, upper_bounds, lower_bounds);
+    = solver.Run(times, equality_bounds, {},{},{},{});
 
   PolynomialSampler::Options sampler_options;
   sampler_options.frequency = 20;
