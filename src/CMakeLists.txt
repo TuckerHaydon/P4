@@ -11,7 +11,7 @@ add_library(${TARGET}
   polynomial_sampler.cc
   polynomial_sampler.h
   polynomial_path.h
-  path_constraint.h)
+  polynomial_bounds.h)
 target_link_libraries(${TARGET} PRIVATE 
   osqp::osqpstatic 
   Eigen3::Eigen

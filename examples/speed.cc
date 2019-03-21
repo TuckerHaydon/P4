@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
 
   PolynomialSolver solver(solver_options);
   const PolynomialPath path
-    = solver.Run(times, equality_bounds, {},{},{},{});
+    = solver.Run(times, equality_bounds,{},{});
 
   return EXIT_SUCCESS;
 }

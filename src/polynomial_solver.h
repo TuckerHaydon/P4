@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "path_constraint.h"
+#include "polynomial_bounds.h"
 #include "polynomial_path.h"
 
 namespace mediation_layer {
@@ -46,15 +46,10 @@ namespace mediation_layer {
         size_t continuity_order = 0;
 
         // Number of intermediate points for segment inequality constraints
-        size_t num_intermediate_points = 10;
+        size_t num_intermediate_points = 20;
 
         // Solver options
         bool polish = false;
-
-        // Multi-threading options
-        // Currently unused. 
-        bool multithread = false;
-        size_t num_threads = 0;
   
         Options() {}
         void Check();
@@ -66,10 +61,8 @@ namespace mediation_layer {
       PolynomialPath Run(
           const std::vector<double>& times,
           const std::vector<NodeEqualityBound>& node_equality_bounds,
-          const std::vector<NodeUpperBound>& node_upper_bounds,
-          const std::vector<NodeLowerBound>& node_lower_bounds,
-          const std::vector<SegmentUpperBound>& segment_upper_bounds,
-          const std::vector<SegmentLowerBound>& segment_lower_bounds);
+          const std::vector<NodeInequalityBound>& node_inequality_bounds,
+          const std::vector<SegmentInequalityBound>& segment_inequality_bounds);
   
     private:
       Options options_;

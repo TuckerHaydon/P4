@@ -17,6 +17,7 @@ namespace mediation_layer {
       size_t polynomial_order;
       size_t derivative_order;
       size_t continuity_order;
+      size_t num_intermediate_points;
       size_t num_nodes;
       size_t num_segments;
       size_t num_params_per_node_per_dim;
@@ -31,7 +32,7 @@ namespace mediation_layer {
       return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
     }
 
-    Eigen::MatrixXd CoefficientVector(
+    Eigen::MatrixXd TimeVector(
         const size_t polynomial_order, 
         const size_t derivative_order, 
         const double dt) {
@@ -55,6 +56,26 @@ namespace mediation_layer {
       coefficient_vec = shift_mat * base_coefficient_vec;
     
       return coefficient_vec;
+    }
+
+    // Computes the scaling matrix. The scaling matrix is required because the
+    // polynomial solver assumes unit time for each polynomial segment. In
+    // truth, the time between each segment may differ, so a temporal scaling is
+    // required. The scaling matrix is square, with increasing powers of the
+    // scale along the diagonal. See the theory documentation for an
+    // explanation.
+    Eigen::MatrixXd ScaleMatrix(
+        const size_t polynomial_order,
+        const double alpha) {
+      Eigen::MatrixXd scale_mat;
+      scale_mat.resize(polynomial_order + 1, polynomial_order + 1);
+      scale_mat.fill(0);
+
+      for(size_t polynomial_idx = 0; polynomial_idx < polynomial_order + 1; ++polynomial_idx) {
+        scale_mat(polynomial_idx, polynomial_idx) = std::pow(alpha, polynomial_idx);
+      }
+
+      return scale_mat;
     }
 
     // Generates a square matrix that is the integrated form of p(x)'p(x)
@@ -103,11 +124,10 @@ namespace mediation_layer {
     // constraints.
     void SetConstraints(
         const Info& info,
+        const std::vector<double>& times,
         const std::vector<NodeEqualityBound>& explicit_node_equality_bounds, 
-        const std::vector<NodeLowerBound>& explicit_node_lower_bounds,
-        const std::vector<NodeUpperBound>& explicit_node_upper_bounds,
-        const std::vector<SegmentLowerBound>& explicit_segment_lower_bounds,
-        const std::vector<SegmentUpperBound>& explicit_segment_upper_bounds,
+        const std::vector<NodeInequalityBound>& explicit_node_inequality_bounds,
+        const std::vector<SegmentInequalityBound>& explicit_segment_inequality_bounds,
         Eigen::MatrixXd& lower_bound_vec, 
         Eigen::MatrixXd& upper_bound_vec,
         std::vector<Eigen::Triplet<double>>& constraint_triplets
@@ -141,53 +161,29 @@ namespace mediation_layer {
               }
             }
 
-            // Lower Bound Constraints
-            // for(const EqualityBound& bound: explicit_node_equality_bounds) {
-            //   if(
-            //       false == (bound.node_idx == node_idx) ||
-            //       false == (bound.dimension_idx == dimension_idx) || 
-            //       false == (bound.derivative_idx == derivative_idx)) {
-            //     continue;
-            //   }
-            //   else {
-            //     // Bounds
-            //     lower_bound_vec(constraint_idx,0) = bound.value;
-            //     upper_bound_vec(constraint_idx,0) = bound.value;
+            // Node inequality bound constraints
+            for(const NodeInequalityBound& bound: explicit_node_inequality_bounds) {
+              if(
+                  false == (bound.node_idx == node_idx) ||
+                  false == (bound.dimension_idx == dimension_idx) || 
+                  false == (bound.derivative_idx == derivative_idx)) {
+                continue;
+              }
+              else {
+                // Bounds
+                lower_bound_vec(constraint_idx,0) = bound.lower;
+                upper_bound_vec(constraint_idx,0) = bound.upper;
 
-            //     // Constraints
-            //     size_t parameter_idx = 0 
-            //       + derivative_idx 
-            //       + info.num_params_per_node_per_dim * node_idx
-            //       + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
-            //     constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
+                // Constraints
+                size_t parameter_idx = 0 
+                  + derivative_idx 
+                  + info.num_params_per_node_per_dim * node_idx
+                  + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
+                constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
 
-            //     constraint_idx++;
-            //   }
-            // }
-
-            // Upper Bound Constraints
-            // for(const EqualityBound& bound: explicit_node_equality_bounds) {
-            //   if(
-            //       false == (bound.node_idx == node_idx) ||
-            //       false == (bound.dimension_idx == dimension_idx) || 
-            //       false == (bound.derivative_idx == derivative_idx)) {
-            //     continue;
-            //   }
-            //   else {
-            //     // Bounds
-            //     lower_bound_vec(constraint_idx,0) = bound.value;
-            //     upper_bound_vec(constraint_idx,0) = bound.value;
-
-            //     // Constraints
-            //     size_t parameter_idx = 0 
-            //       + derivative_idx 
-            //       + info.num_params_per_node_per_dim * node_idx
-            //       + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
-            //     constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
-
-            //     constraint_idx++;
-            //   }
-            // }
+                constraint_idx++;
+              }
+            }
           }
 
           // Continuity constraints
@@ -205,7 +201,7 @@ namespace mediation_layer {
               segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
               segment_propagation_coefficients.fill(0);
               segment_propagation_coefficients 
-                = CoefficientVector(info.polynomial_order, continuity_idx, delta_t).transpose();
+                = TimeVector(info.polynomial_order, continuity_idx, delta_t).transpose();
 
               // Minus the next node
               Eigen::MatrixXd segment_terminal_coefficients;
@@ -239,6 +235,55 @@ namespace mediation_layer {
               constraint_idx++;
             }
           }
+        }
+      }
+
+      // Start and endpoints are not included in segment bounds
+      const double dt = 1.0 / (info.num_intermediate_points + 2);
+
+      // Segment lower bound constraints
+      for(const SegmentInequalityBound& bound: explicit_segment_inequality_bounds) {
+        const double alpha = 1.0 / (times[bound.segment_idx+1] - times[bound.segment_idx]);
+        const Eigen::MatrixXd scale_mat = ScaleMatrix(info.polynomial_order, alpha);
+
+        // point_idx == intermediate_point_idx
+        for(size_t point_idx = 0; point_idx < info.num_intermediate_points; ++point_idx)  {
+          // Bounds
+          lower_bound_vec(constraint_idx,0) = -SegmentInequalityBound::INFTY;
+          upper_bound_vec(constraint_idx,0) = bound.value;
+
+          // Start point not included
+          double time = (1 + point_idx) * dt;
+
+          Eigen::MatrixXd segment_propagation_coefficients;
+          segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
+          segment_propagation_coefficients.fill(0);
+          segment_propagation_coefficients 
+            = TimeVector(info.polynomial_order, bound.derivative_idx, time).transpose();
+
+          for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
+            Eigen::MatrixXd transform_coefficients;
+            transform_coefficients.resize(1, info.num_params_per_segment_per_dim);
+            transform_coefficients.fill(0);
+            transform_coefficients = bound.mapping(dimension_idx, 0) 
+              * segment_propagation_coefficients 
+              * scale_mat(bound.derivative_idx, bound.derivative_idx);
+
+            size_t current_segment_idx = 0 
+              // Get to the right dimension
+              + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
+              // Get to the right node
+              + info.num_params_per_segment_per_dim * bound.segment_idx;
+
+            for(size_t param_idx = 0; param_idx < info.num_params_per_segment_per_dim; ++param_idx) {
+              constraint_triplets.emplace_back(
+                  constraint_idx, 
+                  current_segment_idx + param_idx, 
+                  transform_coefficients(0, param_idx));
+            }
+          }
+
+          constraint_idx++;
         }
       }
     }
@@ -322,10 +367,8 @@ namespace mediation_layer {
   PolynomialPath PolynomialSolver::Run(
       const std::vector<double>& times,
       const std::vector<NodeEqualityBound>& explicit_node_equality_bounds,
-      const std::vector<NodeUpperBound>& explicit_node_upper_bounds,
-      const std::vector<NodeLowerBound>& explicit_node_lower_bounds,
-      const std::vector<SegmentUpperBound>& explicit_segment_upper_bounds,
-      const std::vector<SegmentLowerBound>& explicit_segment_lower_bounds) {
+      const std::vector<NodeInequalityBound>& explicit_node_inequality_bounds,
+      const std::vector<SegmentInequalityBound>& explicit_segment_inequality_bounds) {
 
     this->options_.Check();
 
@@ -339,6 +382,7 @@ namespace mediation_layer {
     info.polynomial_order = this->options_.polynomial_order;
     info.derivative_order = this->options_.derivative_order;
     info.continuity_order = this->options_.continuity_order;
+    info.num_intermediate_points = this->options_.num_intermediate_points;
     info.num_nodes = times.size();
     info.num_segments = info.num_nodes - 1;
     info.num_params_per_node_per_dim = info.polynomial_order + 1;
@@ -346,6 +390,17 @@ namespace mediation_layer {
     info.num_params_per_node = info.num_dimensions * info.num_params_per_node_per_dim;
     info.num_params_per_segment = info.num_dimensions * info.num_params_per_segment_per_dim;
     info.total_num_params = info.num_params_per_node * info.num_nodes;
+
+    // Explicit constraints are provided
+    const size_t num_explicit_constraints = 0
+      + explicit_node_equality_bounds.size() 
+      + explicit_node_inequality_bounds.size() 
+      + explicit_segment_inequality_bounds.size() * info.num_intermediate_points;
+
+    // Implicit constraints are continuity constraints
+    const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
+
+    info.num_constraints = num_explicit_constraints + num_implicit_constraints;
 
     /* The number of constraints is governed by the following rules:
      * 1) The first node must be constrained by at least the 0th, 1st, and 2nd
@@ -366,14 +421,6 @@ namespace mediation_layer {
       + (info.num_nodes - 1)*info.num_dimensions
       + info.num_segments*(info.continuity_order+1)*info.num_dimensions;
 
-    // Explicit constraints are provided
-    const size_t num_explicit_constraints = explicit_node_equality_bounds.size() + explicit_node_upper_bounds.size() + explicit_node_lower_bounds.size();
-
-    // Implicit constraints are continuity constraints
-    const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
-
-    info.num_constraints = num_explicit_constraints + num_implicit_constraints;
-
     if(info.num_constraints < min_num_constraints) {
       std::cerr << "PolynomialSolver::Run -- Too few constraints." << std::endl;
       std::exit(EXIT_FAILURE);
@@ -389,11 +436,10 @@ namespace mediation_layer {
     std::vector<Eigen::Triplet<double>> constraint_triplets;
     SetConstraints(
         info, 
+        times,
         explicit_node_equality_bounds,
-        explicit_node_lower_bounds,
-        explicit_node_upper_bounds,
-        explicit_segment_lower_bounds,
-        explicit_segment_upper_bounds,
+        explicit_node_inequality_bounds,
+        explicit_segment_inequality_bounds,
         lower_bound_vec, 
         upper_bound_vec, 
         constraint_triplets);

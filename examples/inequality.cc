@@ -12,14 +12,14 @@ using namespace mediation_layer;
 
 int main(int argc, char** argv) {
 
-  const std::vector<double> times = {0, 1, 2.5, 3.3};
+  const std::vector<double> times = {0, 0.5, 1, 1.5};
 
   // Equality bounds paramater order is:
   // 1) Dimension index
   // 2) Node index
   // 3) Derivative index
   // 4) Value
-  const std::vector<NodeEqualityBound> equality_bounds = {
+  const std::vector<NodeEqualityBound> node_equality_bounds = {
     // The first node must constrain position, velocity, and acceleration
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(1,0,0,0),
@@ -40,11 +40,27 @@ int main(int argc, char** argv) {
     NodeEqualityBound(0,2,0,1),
     NodeEqualityBound(1,2,0,1),
     NodeEqualityBound(2,2,0,1),
+  };
 
-    // The fourth node constrains position
-    NodeEqualityBound(0,3,0,0),
-    NodeEqualityBound(1,3,0,0),
-    NodeEqualityBound(2,3,0,0),
+  const std::vector<NodeInequalityBound> node_inequality_bounds = {
+    // The fourth node constrain position
+    NodeInequalityBound(0,3,0,0,0),
+    NodeInequalityBound(1,3,0,0,0),
+    NodeInequalityBound(2,3,0,-0.2,0.2),
+  };
+
+  // Order: segment, derivative, mapping, value
+  const std::vector<SegmentInequalityBound> segment_inequality_bounds = {
+    // Constrain y pos to corridor
+    SegmentInequalityBound(0,0,Eigen::Vector3d(0,1,0), 0.001),
+    SegmentInequalityBound(0,0,Eigen::Vector3d(0,-1,0),0.001),
+
+    // Constrain z pos to corridor
+    SegmentInequalityBound(0,0,Eigen::Vector3d(0,0,1),0.001),
+    SegmentInequalityBound(0,0,Eigen::Vector3d(0,0,-1),0.001),
+
+    // Constrain x vel below 3 m/s
+    SegmentInequalityBound(0,1,Eigen::Vector3d(1,0,0),3),
   };
 
   PolynomialSolver::Options solver_options;
@@ -56,7 +72,11 @@ int main(int argc, char** argv) {
 
   PolynomialSolver solver(solver_options);
   const PolynomialPath path
-    = solver.Run(times, equality_bounds,{},{});
+    = solver.Run(
+        times, 
+        node_equality_bounds, 
+        node_inequality_bounds, 
+        segment_inequality_bounds);
 
   PolynomialSampler::Options sampler_options;
   sampler_options.frequency = 20;
