@@ -98,10 +98,12 @@ namespace mediation_layer {
         const Eigen::MatrixXd polynomial_coefficients 
           = path.coefficients[dimension_idx].col(node_idx);
         const Eigen::MatrixXd scale_mat = ScaleMatrix(polynomial_order, alpha);
-        const Eigen::MatrixXd time_vector = TimeVector(polynomial_order, 0, time - times[node_idx]);
+        const Eigen::MatrixXd time_vector 
+          = TimeVector(polynomial_order, this->options_.derivative_order, time - times[node_idx]);
 
         // Time is the first dimension. Shift the index down.
-        samples(dimension_idx + 1, sample_idx) = (polynomial_coefficients.transpose() * scale_mat * time_vector)(0,0);
+        samples(dimension_idx + 1, sample_idx) 
+          = (polynomial_coefficients.transpose() * scale_mat * time_vector)(0,0);
       }
     }
 

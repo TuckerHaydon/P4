@@ -17,6 +17,9 @@ namespace mediation_layer {
         // Frequency of samples per second
         double frequency = 20;
 
+        // Order of the derivative to sample. 0 = pos, 1 = vel, ...
+        size_t derivative_order = 0;
+
         Options(){}
       };
 
