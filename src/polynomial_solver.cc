@@ -58,26 +58,6 @@ namespace mediation_layer {
       return coefficient_vec;
     }
 
-    // Computes the scaling matrix. The scaling matrix is required because the
-    // polynomial solver assumes unit time for each polynomial segment. In
-    // truth, the time between each segment may differ, so a temporal scaling is
-    // required. The scaling matrix is square, with increasing powers of the
-    // scale along the diagonal. See the theory documentation for an
-    // explanation.
-    Eigen::MatrixXd ScaleMatrix(
-        const size_t polynomial_order,
-        const double alpha) {
-      Eigen::MatrixXd scale_mat;
-      scale_mat.resize(polynomial_order + 1, polynomial_order + 1);
-      scale_mat.fill(0);
-
-      for(size_t polynomial_idx = 0; polynomial_idx < polynomial_order + 1; ++polynomial_idx) {
-        scale_mat(polynomial_idx, polynomial_idx) = std::pow(alpha, polynomial_idx);
-      }
-
-      return scale_mat;
-    }
-
     // Generates a square matrix that is the integrated form of p(x)'p(x)
     Eigen::MatrixXd QuadraticMatrix(
         const size_t polynomial_order,
@@ -146,9 +126,11 @@ namespace mediation_layer {
                 continue;
               }
               else {
-                // Bounds
-                lower_bound_vec(constraint_idx,0) = bound.value;
-                upper_bound_vec(constraint_idx,0) = bound.value;
+                const double alpha = node_idx+1 < info.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
+
+                // Bounds. Scaled by alpha. See documentation.
+                lower_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, derivative_idx);
+                upper_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, derivative_idx);
 
                 // Constraints
                 size_t parameter_idx = 0 
@@ -170,9 +152,11 @@ namespace mediation_layer {
                 continue;
               }
               else {
-                // Bounds
-                lower_bound_vec(constraint_idx,0) = bound.lower;
-                upper_bound_vec(constraint_idx,0) = bound.upper;
+                const double alpha = node_idx+1 < info.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
+
+                // Bounds. Scaled by alpha. See documentation.
+                lower_bound_vec(constraint_idx,0) = bound.lower * std::pow(alpha, derivative_idx);
+                upper_bound_vec(constraint_idx,0) = bound.upper * std::pow(alpha, derivative_idx);
 
                 // Constraints
                 size_t parameter_idx = 0 
@@ -190,24 +174,29 @@ namespace mediation_layer {
           if(node_idx < info.num_segments) {
             const size_t num_continuity_constraints = info.continuity_order + 1;
             constexpr double delta_t = 1.0;
+            const double alpha_k = times[node_idx + 1] - times[node_idx];
+            const double alpha_kp1 = node_idx + 2 < info.num_nodes ? times[node_idx + 2] - times[node_idx + 1] : 1.0;
+
+
             for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
               // Bounds
               lower_bound_vec(constraint_idx,0) = 0;
               upper_bound_vec(constraint_idx,0) = 0;
 
-              // Constraints
+              // Constraints. Scaled by alpha. See documentation.
               // Propagate the current node
               Eigen::MatrixXd segment_propagation_coefficients;
               segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
               segment_propagation_coefficients.fill(0);
               segment_propagation_coefficients 
-                = TimeVector(info.polynomial_order, continuity_idx, delta_t).transpose();
+                = TimeVector(info.polynomial_order, continuity_idx, delta_t).transpose()
+                / std::pow(alpha_k, continuity_idx);
 
               // Minus the next node
               Eigen::MatrixXd segment_terminal_coefficients;
               segment_terminal_coefficients.resize(1, info.num_params_per_segment_per_dim);
               segment_terminal_coefficients.fill(0);
-              segment_terminal_coefficients(0,continuity_idx) = -1;
+              segment_terminal_coefficients(0,continuity_idx) = -1 / std::pow(alpha_kp1, continuity_idx);
 
               size_t current_segment_idx = 0 
                 // Get to the right dimension
@@ -243,14 +232,13 @@ namespace mediation_layer {
 
       // Segment lower bound constraints
       for(const SegmentInequalityBound& bound: explicit_segment_inequality_bounds) {
-        const double alpha = 1.0 / (times[bound.segment_idx+1] - times[bound.segment_idx]);
-        const Eigen::MatrixXd scale_mat = ScaleMatrix(info.polynomial_order, alpha);
+        const double alpha = times[bound.segment_idx+1] - times[bound.segment_idx];
 
         // point_idx == intermediate_point_idx
         for(size_t point_idx = 0; point_idx < info.num_intermediate_points; ++point_idx)  {
           // Bounds
           lower_bound_vec(constraint_idx,0) = -SegmentInequalityBound::INFTY;
-          upper_bound_vec(constraint_idx,0) = bound.value;
+          upper_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, bound.derivative_idx);
 
           // Start point not included
           double time = (1 + point_idx) * dt;
@@ -266,8 +254,7 @@ namespace mediation_layer {
             transform_coefficients.resize(1, info.num_params_per_segment_per_dim);
             transform_coefficients.fill(0);
             transform_coefficients = bound.mapping(dimension_idx, 0) 
-              * segment_propagation_coefficients 
-              * scale_mat(bound.derivative_idx, bound.derivative_idx);
+              * segment_propagation_coefficients;
 
             size_t current_segment_idx = 0 
               // Get to the right dimension

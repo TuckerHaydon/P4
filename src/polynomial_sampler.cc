@@ -40,25 +40,6 @@ namespace mediation_layer {
       return coefficient_vec;
     }
 
-    // Computes the scaling matrix. The scaling matrix is required because the
-    // polynomial solver assumes unit time for each polynomial segment. In
-    // truth, the time between each segment may differ, so a temporal scaling is
-    // required. The scaling matrix is square, with increasing powers of the
-    // scale along the diagonal. See the theory documentation for an
-    // explanation.
-    Eigen::MatrixXd ScaleMatrix(
-        const size_t polynomial_order,
-        const double alpha) {
-      Eigen::MatrixXd scale_mat;
-      scale_mat.resize(polynomial_order + 1, polynomial_order + 1);
-      scale_mat.fill(0);
-
-      for(size_t polynomial_idx = 0; polynomial_idx < polynomial_order + 1; ++polynomial_idx) {
-        scale_mat(polynomial_idx, polynomial_idx) = std::pow(alpha, polynomial_idx);
-      }
-
-      return scale_mat;
-    }
   }
 
   // Sample a polynomial path solution
@@ -83,27 +64,29 @@ namespace mediation_layer {
     double start_time = times.front();
 
     for(size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
-      const double time = start_time + sample_idx / this->options_.frequency;
+      const double path_time = start_time + sample_idx / this->options_.frequency;
 
-      if(time > times[node_idx + 1]) {
+      if(path_time > times[node_idx + 1]) {
         node_idx++;
       }
 
       // Push time
-      samples(0, sample_idx) = time;
+      samples(0, sample_idx) = path_time;
 
       for(size_t dimension_idx = 0; dimension_idx < num_dimensions; ++dimension_idx) {
-        const double alpha = 1.0 / (times[node_idx+1] - times[node_idx]);
+        const double alpha = times[node_idx+1] - times[node_idx];
+        const double t = path_time - times[node_idx];
+        const double tau = t / alpha;
 
         const Eigen::MatrixXd polynomial_coefficients 
           = path.coefficients[dimension_idx].col(node_idx);
-        const Eigen::MatrixXd scale_mat = ScaleMatrix(polynomial_order, alpha);
-        const Eigen::MatrixXd time_vector 
-          = TimeVector(polynomial_order, this->options_.derivative_order, time - times[node_idx]);
+        const Eigen::MatrixXd tau_vec
+          = TimeVector(polynomial_order, this->options_.derivative_order, tau);
 
         // Time is the first dimension. Shift the index down.
         samples(dimension_idx + 1, sample_idx) 
-          = (polynomial_coefficients.transpose() * scale_mat * time_vector)(0,0);
+          = (polynomial_coefficients.transpose() * tau_vec)(0,0) 
+          / std::pow(alpha, this->options_.derivative_order);
       }
     }
 
