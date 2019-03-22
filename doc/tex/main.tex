@@ -68,6 +68,50 @@ programming problem:
 %
 \href{https://osqp.org}{OSQP} is used to solve the QP problem \cite{osqp}.
 
+\section{Scaling}
+Waypoint arrival times are arbitrary --- they can be as small as a millisecond
+or as large as a minute. In order to avoid numerical instability in the QP
+solver due to exponentiation of potentially large and small times, segment
+duration is normalized to unity. This normalized time is refered to as the
+`computation time'.
+
+Let $t \in [0, t_{f}]$ represent the physical time along a segment and $\tau \in
+[0, 1]$ represent the computational time along a segment. The two are related by
+a scaling factor.
+%
+\begin{equation}
+  t = \alpha \tau
+\end{equation}
+%
+Path constraints are specified using physical time. These must be converted to
+constraints in computational time. Define a constraint:
+%
+\begin{equation}
+  \frac{dP(t/\alpha)}{dt} < \kappa
+\end{equation}
+%
+Change of basis using $\tau = t / \alpha$ and $d\tau = dt / \alpha$. Substitute
+and rearrange:
+%
+\begin{equation}
+  \frac{dP(\tau)}{d\tau} < \alpha \kappa
+\end{equation}
+%
+Constraints on higher derivatives are derived using the same process.
+\begin{equation}
+  \frac{dP^{n}(t/\alpha)}{dt^{n}} < \kappa \rightarrow
+  \frac{dP^{n}(\tau)}{d\tau^{n}} < \alpha^{n} \kappa
+\end{equation}
+%
+Continuity constraints merit special consideration. These constraints require
+that the $n$th derivative of the end of a segment match the $n$th derivative of
+the following segment. Since the time scaling of each segment may be different,
+the constraint manifests so:
+\begin{equation}
+  \frac{dP_{k}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k}^{n}} =
+  \frac{dP_{k+1}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k+1}^{n}}
+\end{equation}
+
 \section{Usage Notes}
 \begin{enumerate}
   \item The polynomial order must be greater than 1.
