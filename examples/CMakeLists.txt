@@ -25,11 +25,3 @@ target_link_libraries(inequality
   ${Boost_LIBRARIES} 
   Eigen3::Eigen
 )
-
-add_executable(tests test.cc gnuplot-iostream.h)
-target_include_directories(tests PUBLIC ../src)
-target_link_libraries(tests
-  lib_p4
-  ${Boost_LIBRARIES} 
-  Eigen3::Eigen
-)
