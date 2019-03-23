@@ -17,11 +17,3 @@ target_link_libraries(speed
   lib_p4
   Eigen3::Eigen
 )
-
-add_executable(inequality inequality.cc gnuplot-iostream.h)
-target_include_directories(inequality PUBLIC ../src)
-target_link_libraries(inequality
-  lib_p4
-  ${Boost_LIBRARIES} 
-  Eigen3::Eigen
-)
