@@ -1,9 +1,9 @@
 // Author: Tucker Haydon
 
-#include <cstdlib>
-
-#include <Eigen/Dense>
 #include "gnuplot-iostream.h"
+
+#include <cstdlib>
+#include <Eigen/Dense>
 
 #include "polynomial_solver.h"
 #include "polynomial_sampler.h"
@@ -12,15 +12,13 @@ using namespace mediation_layer;
 
 int main(int argc, char** argv) {
 
-  const std::vector<double> times = {0, 1, 2.5, 3.3};
+  // Time in seconds
+  const std::vector<double> times = {0, 1, 2.5};
 
-  // Equality bounds paramater order is:
-  // 1) Dimension index
-  // 2) Node index
-  // 3) Derivative index
-  // 4) Value
-  const std::vector<NodeEqualityBound> equality_bounds = {
+  // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
+  const std::vector<NodeEqualityBound> node_equality_bounds = {
     // The first node must constrain position, velocity, and acceleration
+    // Constraining position, velocity, and acceleration to zero
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(1,0,0,0),
     NodeEqualityBound(2,0,0,0),
@@ -31,32 +29,47 @@ int main(int argc, char** argv) {
     NodeEqualityBound(1,0,2,0),
     NodeEqualityBound(2,0,2,0),
 
-    // The second node constrains position
+    // Other nodes may constrain whatever they want
+    // The second node is constraining position to (1,0,0)
     NodeEqualityBound(0,1,0,1),
     NodeEqualityBound(1,1,0,0),
     NodeEqualityBound(2,1,0,0),
 
-    // The third node constrains position
+    // The third node is contraining position to (1,1,free)
     NodeEqualityBound(0,2,0,1),
     NodeEqualityBound(1,2,0,1),
-    NodeEqualityBound(2,2,0,1),
-
-    // The fourth node constrains position
-    NodeEqualityBound(0,3,0,0),
-    NodeEqualityBound(1,3,0,0),
-    NodeEqualityBound(2,3,0,1),
   };
 
+  // NodeInequalityBound(dimension_idx, node_idx, derivative_idx, lower, upper)
+  const std::vector<NodeInequalityBound> node_inequality_bounds = {
+    // Constraining the z value of the third node above 0
+    NodeInequalityBound(2,2,0,0,NodeInequalityBound::INFTY),
+  };
+
+  // SegmentInequalityBound(segment_idx, derivative_idx, mapping, value)
+  // Segment inequality bounds constrain a derivative of a segment to 
+  //   dot(a,x) < b
+  const std::vector<SegmentInequalityBound> segment_inequality_bounds = {
+    // Constraining the x-acceleration of the first segment below 4 m/s^2
+    SegmentInequalityBound(0,2,Eigen::Vector3d(1,0,0),4),
+  };
+
+  // Configure solver options
   PolynomialSolver::Options solver_options;
-  solver_options.num_dimensions = 3;     // 3D
-  solver_options.polynomial_order = 8;   // Fit an 7th-order polynomial
-  solver_options.continuity_order = 4;   // Require continuity to the 4th order
-  solver_options.derivative_order = 4;   // Minimize the 4th order (snap)
+  solver_options.num_dimensions   = 3;   // 3D
+  solver_options.polynomial_order = 8;   // Fit an 8th-order polynomial
+  solver_options.continuity_order = 4;   // Require continuity through the 4th derivative
+  solver_options.derivative_order = 2;   // Minimize the 2nd derivative (acceleration)
   solver_options.polish = true;          // Polish the solution
 
+  // Solve
   PolynomialSolver solver(solver_options);
   const PolynomialPath path
-    = solver.Run(times, equality_bounds,{},{});
+    = solver.Run(
+        times, 
+        node_equality_bounds,
+        node_inequality_bounds,
+        segment_inequality_bounds);
 
   // Sampling and Plotting
   { // Plot acceleration profiles
@@ -141,10 +154,6 @@ int main(int argc, char** argv) {
     std::cout << "Press enter to exit." << std::endl;
     std::cin.get();
   }
-
-
-
-
 
   return EXIT_SUCCESS;
 }
