@@ -18,7 +18,7 @@ document by following the instructions below.
 
 Examples are found in the [examples](examples/) directory. 
 
-## Usage Overview
+## Example Usage
 ```c++
 #include <cstdlib>
 #include <Eigen/Dense>
@@ -60,8 +60,8 @@ int main(int argc, char** argv) {
 
   // NodeInequalityBound(dimension_idx, node_idx, derivative_idx, lower, upper)
   const std::vector<NodeInequalityBound> node_inequality_bounds = {
-    // Constraining the z value of the third node above 0
-    NodeInequalityBound(2,2,0,0,NodeInequalityBound::INFTY),
+    // Constraining the z value of the third node above 0.5
+    NodeInequalityBound(2,2,0,0.5,NodeInequalityBound::INFTY),
   };
 
   // SegmentInequalityBound(segment_idx, derivative_idx, mapping, value)
@@ -97,6 +97,10 @@ int main(int argc, char** argv) {
   PolynomialSampler sampler(sampler_options);
   Eigen::MatrixXd samples = sampler.Run(times, path);
 ```
+
+![](doc/img/trajectory.svg "Trajectory") 
+![](doc/img/velocity.svg "Velocity") 
+![](doc/img/acceleration.svg "Acceleration")
 
 
 ## Build Requirements
