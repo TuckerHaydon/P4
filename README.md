@@ -105,10 +105,32 @@ int main(int argc, char** argv) {
 
 ## Build Requirements
 1) Install [Eigen](http://eigen.tuxfamily.org)
-2) Install [OSQP](https://github.com/oxfordcontrol/osqp)
-3) Install gnuplot and boost
+2) Install gnuplot and boost
 ```bash
 sudo apt install libboost-all-dev gnuplot
+```
+
+3) Install [OSQP](https://github.com/oxfordcontrol/osqp)
+
+If the installation instructions from OSQP's website are not working properly, follow the guidelines below:
+```
+git clone https://github.com/oxfordcontrol/osqp
+cd osqp
+git submodule update --init --recursive
+mkdir build
+cd build
+```
+
+In Linux and Mac OS run
+```
+     cmake -G "Unix Makefiles" ..
+```
+In Windows run
+```
+     cmake -G "MinGW Makefiles" ..
+```
+```
+cmake --build .
 ```
 
 
