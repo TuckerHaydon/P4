@@ -509,6 +509,7 @@ namespace mediation_layer {
      * SOLUTION
      */
     PolynomialPath solution;
+    solution.optimal_cost = work->info->obj_val;
     solution.coefficients.reserve(info.num_dimensions);
     for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
       // Allocate dynamic matrix

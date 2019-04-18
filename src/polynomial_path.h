@@ -13,6 +13,9 @@ namespace mediation_layer {
     // of the matrix contains the coefficients for each node, and the row
     // number specifies the coefficient index.
     std::vector<Eigen::MatrixXd> coefficients;
+
+    // Returns the optimal cost of the optimization problem J = 0.5 * x'.P.x
+    double optimal_cost;
   
     PolynomialPath(const std::vector<Eigen::MatrixXd>& coefficients_ = {})
       : coefficients(coefficients_) {}
