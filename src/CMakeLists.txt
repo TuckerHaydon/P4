@@ -12,7 +12,6 @@ add_library(${TARGET}
   polynomial_sampler.h
   polynomial_path.h
   polynomial_bounds.h)
-target_link_libraries(${TARGET} PRIVATE 
-  osqp::osqpstatic 
-  Eigen3::Eigen
-  ${CMAKE_DL_LIBS})
+target_link_libraries(${TARGET} PUBLIC
+  osqp::osqp
+  Eigen3::Eigen)
