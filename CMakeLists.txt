@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.1)
 project(P4)
-set(CMAKE_CXX_STANDARD 14)
 
 set(default_build_type "Release")
-if(NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
   set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
       STRING "Choose the type of build." FORCE)
