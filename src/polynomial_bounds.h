@@ -5,7 +5,7 @@
 #include <osqp.h>
 #include <Eigen/Dense>
 
-namespace mediation_layer {
+namespace p4 {
   // Example:
   // Given a 3D problem (XYZ), the y-snap of the third node can be
   // constrained to -1 as follows:

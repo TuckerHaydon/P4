@@ -5,7 +5,7 @@
 #include <vector>
 #include <Eigen/Dense>
 
-namespace mediation_layer {
+namespace p4 {
   // Encapsulates information about the piecewise polynomial solution.
   struct PolynomialPath {
     // Vector containing the polynomial coefficient solutions for each

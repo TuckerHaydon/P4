@@ -10,7 +10,7 @@
 
 #include "polynomial_solver.h"
 
-namespace mediation_layer {
+namespace p4 {
   namespace {
     struct Info {   
       size_t num_dimensions;

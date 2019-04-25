@@ -8,7 +8,7 @@
 
 #include "polynomial_path.h"
 
-namespace mediation_layer {
+namespace p4 {
   // Class that samples the piecewise polynomial solution.
   class PolynomialSampler {
     public:

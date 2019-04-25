@@ -8,7 +8,7 @@
 #include "polynomial_solver.h"
 #include "polynomial_sampler.h"
 
-using namespace mediation_layer;
+using namespace p4;
 
 int main(int argc, char** argv) {
 

@@ -7,7 +7,7 @@
 #include "polynomial_bounds.h"
 #include "polynomial_path.h"
 
-namespace mediation_layer {
+namespace p4 {
   /* Class for solving piecewise polynomial fitting & minimization problems.
    *
    * Given a polynomial of the following form:

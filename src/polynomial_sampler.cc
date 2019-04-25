@@ -2,7 +2,7 @@
 
 #include "polynomial_sampler.h"
 
-namespace mediation_layer {
+namespace p4 {
   namespace {
     // Computes n!
     size_t factorial(size_t n) {
