@@ -21,7 +21,12 @@ namespace p4 {
       Eigen::MatrixXd base_coefficient_vec;
       base_coefficient_vec.resize(polynomial_order + 1,1);
       for(size_t idx = 0; idx < polynomial_order + 1; ++idx) {
-        base_coefficient_vec(idx, 0) = std::pow(time, idx) / factorial(idx);
+        // std::pow(0,0) undefined. Define as 1.0.
+        if(0.0 == time && 0 == idx) {
+          base_coefficient_vec(idx, 0) = 1.0 / factorial(idx);
+        } else {
+          base_coefficient_vec(idx, 0) = std::pow(time, idx) / factorial(idx);
+        }
       }
     
       Eigen::MatrixXd ones_vec;
