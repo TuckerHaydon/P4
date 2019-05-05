@@ -50,6 +50,9 @@ namespace p4 {
 
         // Solver options
         bool polish = false;
+
+        // Solver settings. These are freed after
+        OSQPSettings osqp_settings;
   
         Options() {}
         void Check();

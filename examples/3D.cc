@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 
   // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
   const std::vector<NodeEqualityBound> node_equality_bounds = {
-    // The first node must constrain position, velocity, and acceleration
+    // The first node is required to constrain position, velocity, and acceleration
     // Constraining position, velocity, and acceleration to zero
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(1,0,0,0),
@@ -60,7 +60,12 @@ int main(int argc, char** argv) {
   solver_options.polynomial_order = 8;   // Fit an 8th-order polynomial
   solver_options.continuity_order = 4;   // Require continuity through the 4th derivative
   solver_options.derivative_order = 2;   // Minimize the 2nd derivative (acceleration)
-  solver_options.polish = true;          // Polish the solution
+
+  // Configure the OSQP settings
+  // Required: Start with the default settings
+  osqp_set_default_settings(&solver_options.osqp_settings);
+  solver_options.osqp_settings.polish = true;       // Polish the solution, getting the best answer possible
+  solver_options.osqp_settings.verbose = false;     // Suppress the printout
 
   // Solve
   PolynomialSolver solver(solver_options);
@@ -70,6 +75,12 @@ int main(int argc, char** argv) {
         node_equality_bounds,
         node_inequality_bounds,
         segment_inequality_bounds);
+
+  // Print some output info
+  // Reference: https://osqp.org/docs/interfaces/cc++#info
+  std::cout << "Status:                    " << path.osqp_info.status << std::endl;
+  std::cout << "Status Val (1 == success): " << path.osqp_info.status_val << std::endl;
+  std::cout << "Optimal Cost:              " << path.osqp_info.obj_val << std::endl;
 
   // Sampling and Plotting
   { // Plot acceleration profiles

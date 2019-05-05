@@ -481,10 +481,6 @@ namespace p4 {
     /*
      * RUN THE SOLVER
      */
-    // Reference: https://osqp.org/docs/examples/demo.html
-    // Problem settings
-    OSQPSettings* settings = (OSQPSettings *)c_malloc(sizeof(OSQPSettings));
-
     // Structures
     OSQPWorkspace* work;
     OSQPData* data;  
@@ -499,13 +495,8 @@ namespace p4 {
     data->l = l;
     data->u = u;
 
-    // Define Solver settings as default
-    osqp_set_default_settings(settings);
-    settings->warm_start = false;
-    settings->polish = this->options_.polish;
-
     // Setup workspace
-    work = osqp_setup(data, settings);
+    work = osqp_setup(data, &this->options_.osqp_settings);
 
     // Solve Problem
     osqp_solve(work);
@@ -514,7 +505,15 @@ namespace p4 {
      * SOLUTION
      */
     PolynomialPath solution;
-    solution.optimal_cost = work->info->obj_val;
+    solution.osqp_info = *work->info;
+
+    // Ensure a solution is found before copying nonsense data
+    if(1 != solution.osqp_info.status_val) {
+      // Solution not found
+      return solution;
+    }
+
+    // Else copy the coefficients
     solution.coefficients.reserve(info.num_dimensions);
     for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
       // Allocate dynamic matrix
@@ -548,7 +547,6 @@ namespace p4 {
     c_free(data->A);
     c_free(data->P);
     c_free(data);
-    c_free(settings);
 
     return solution;
   }

@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <Eigen/Dense>
+#include <osqp.h>
 
 namespace p4 {
   // Encapsulates information about the piecewise polynomial solution.
@@ -16,6 +17,11 @@ namespace p4 {
 
     // Returns the optimal cost of the optimization problem J = 0.5 * x'.P.x
     double optimal_cost;
+
+    // OSQP Output information. Contains information about whether a solution
+    // was found, how long it took to find the solution, the optimal cost, etc.
+    //   osqp_info.obj_val: the optimal cost of the optimization problem J = 0.5 * x'.P.x
+    OSQPInfo osqp_info;
   
     PolynomialPath(const std::vector<Eigen::MatrixXd>& coefficients_ = {})
       : coefficients(coefficients_) {}
