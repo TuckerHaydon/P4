@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
 
   // Configure the OSQP settings
   // Required: Start with the default settings
+  // Reference: https://osqp.org/docs/interfaces/cc++#settings
   osqp_set_default_settings(&solver_options.osqp_settings);
   solver_options.osqp_settings.polish = true;       // Polish the solution, getting the best answer possible
   solver_options.osqp_settings.verbose = false;     // Suppress the printout
