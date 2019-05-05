@@ -17,17 +17,13 @@ int main(int argc, char** argv) {
 
   // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
   const std::vector<NodeEqualityBound> node_equality_bounds = {
-    // The first node is required to constrain position, velocity, and acceleration
-    // Constraining position, velocity, and acceleration to zero
+    // Constraining position and velocity of first node to zero
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(1,0,0,0),
     NodeEqualityBound(2,0,0,0),
     NodeEqualityBound(0,0,1,0),
     NodeEqualityBound(1,0,1,0),
     NodeEqualityBound(2,0,1,0),
-    NodeEqualityBound(0,0,2,0),
-    NodeEqualityBound(1,0,2,0),
-    NodeEqualityBound(2,0,2,0),
 
     // Other nodes may constrain whatever they want
     // The second node is constraining position to (1,0,0)

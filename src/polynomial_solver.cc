@@ -232,21 +232,22 @@ namespace p4 {
         }
       }
 
-      // Start and endpoints are not included in segment bounds
-      const double dt = 1.0 / (info.num_intermediate_points + 2);
+      // Include start- and end-points in segment bounds
+      const double dt = 1.0 / (info.num_intermediate_points - 2);
 
       // Segment lower bound constraints
       for(const SegmentInequalityBound& bound: explicit_segment_inequality_bounds) {
         const double alpha = times[bound.segment_idx+1] - times[bound.segment_idx];
 
         // point_idx == intermediate_point_idx
-        for(size_t point_idx = 0; point_idx < info.num_intermediate_points; ++point_idx)  {
+        // Add 2 for start and end points
+        for(size_t point_idx = 0; point_idx < info.num_intermediate_points+2; ++point_idx)  {
           // Bounds
           lower_bound_vec(constraint_idx,0) = -SegmentInequalityBound::INFTY;
           upper_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, bound.derivative_idx);
 
           // Start point not included
-          double time = (1 + point_idx) * dt;
+          double time = point_idx * dt;
 
           Eigen::MatrixXd segment_propagation_coefficients;
           segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
@@ -387,7 +388,7 @@ namespace p4 {
     const size_t num_explicit_constraints = 0
       + explicit_node_equality_bounds.size() 
       + explicit_node_inequality_bounds.size() 
-      + explicit_segment_inequality_bounds.size() * info.num_intermediate_points;
+      + explicit_segment_inequality_bounds.size() * (info.num_intermediate_points+2);
 
     // Implicit constraints are continuity constraints
     const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
@@ -408,15 +409,15 @@ namespace p4 {
      *  4) Corridor Constraints: TODO
      *      
      */
-    const size_t min_num_constraints = 0
-      + 3*info.num_dimensions 
-      + (info.num_nodes - 1)*info.num_dimensions
-      + info.num_segments*(info.continuity_order+1)*info.num_dimensions;
+    // const size_t min_num_constraints = 0
+    //   + 3*info.num_dimensions 
+    //   + (info.num_nodes - 1)*info.num_dimensions
+    //   + info.num_segments*(info.continuity_order+1)*info.num_dimensions;
 
-    if(info.num_constraints < min_num_constraints) {
-      std::cerr << "PolynomialSolver::Run -- Too few constraints." << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
+    // if(info.num_constraints < min_num_constraints) {
+    //   std::cerr << "PolynomialSolver::Run -- Too few constraints." << std::endl;
+    //   std::exit(EXIT_FAILURE);
+    // }
 
     /*
      * CONSTRAINTS

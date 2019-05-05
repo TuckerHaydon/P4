@@ -20,7 +20,6 @@ int main(int argc, char** argv) {
   // 3) Derivative index
   // 4) Value
   std::vector<NodeEqualityBound> equality_bounds = {
-    // The first node must constrain position, velocity, and acceleration
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(0,0,1,0),
     NodeEqualityBound(0,0,2,0),
