@@ -58,7 +58,6 @@ int main(int argc, char** argv) {
   solver_options.derivative_order = 2;   // Minimize the 2nd derivative (acceleration)
 
   // Configure the OSQP settings
-  // Required: Start with the default settings
   // Reference: https://osqp.org/docs/interfaces/cc++#settings
   solver_options.osqp_settings.polish = true;       // Polish the solution, getting the best answer possible
   solver_options.osqp_settings.verbose = false;     // Suppress the printout

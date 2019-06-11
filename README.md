@@ -78,7 +78,11 @@ int main(int argc, char** argv) {
   solver_options.polynomial_order = 8;   // Fit an 8th-order polynomial
   solver_options.continuity_order = 4;   // Require continuity through the 4th derivative
   solver_options.derivative_order = 2;   // Minimize the 2nd derivative (acceleration)
-  solver_options.polish = true;          // Polish the solution
+
+  // Configure the OSQP settings
+  // Reference: https://osqp.org/docs/interfaces/cc++#settings
+  solver_options.osqp_settings.polish = true;       // Polish the solution, getting the best answer possible
+  solver_options.osqp_settings.verbose = false;     // Suppress the printout
 
   // Solve
   PolynomialSolver solver(solver_options);
@@ -105,12 +109,11 @@ int main(int argc, char** argv) {
 
 ## Build Requirements
 1) Install [Eigen](http://eigen.tuxfamily.org)
-2) Install gnuplot and boost
+2) Install [OSQP](https://github.com/oxfordcontrol/osqp)
+3) [Optional GUI] Install gnuplot and boost
 ```bash
 sudo apt install libboost-all-dev gnuplot
 ```
-
-3) Install [OSQP](https://github.com/oxfordcontrol/osqp)
 
 If the installation instructions from OSQP's website are not working properly, follow the guidelines below:
 ```
@@ -134,7 +137,14 @@ cmake --build .
 ```
 
 
-## Build
+## Build without GUI
+```bash
+mkdir build && cd build
+cmake -DBUILD_3D_EXAMPLE=false ..
+make -j4
+```
+
+## Build with GUI example 
 ```bash
 mkdir build && cd build
 cmake ..
@@ -168,5 +178,5 @@ make
 - [gnuplot-iostream](http://stahlke.org/dan/gnuplot-iostream/)
 
 ## Contact
-Tucker Haydon (thaydon@utexas.edu)
+Tucker Haydon (tuckerhaydon@gmail.com)
 
