@@ -37,8 +37,7 @@ int main(int argc, char** argv) {
   solver_options.continuity_order = 4;
   solver_options.derivative_order = 4;
 
-  osqp_set_default_settings(&solver_options.osqp_settings);
-  solver_options.osqp_settings.polish = true;       // Polish the solution, getting the best answer possible
+  solver_options.osqp_settings.polish = true;      // Polish the solution, getting the best answer possible
   solver_options.osqp_settings.verbose = true;     // Suppress the printout
 
   PolynomialSolver solver(solver_options);

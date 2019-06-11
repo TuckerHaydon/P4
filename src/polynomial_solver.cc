@@ -32,6 +32,13 @@ namespace p4 {
       return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
     }
 
+    // Constructs and takes the derivative of a vector of the form:
+    //   [ (1/0! dt^0), (1/1! dt^1), (1/2! dt^2) ... ]'
+    // The derivative can be efficiently easily calculated by prepadding zeros
+    // to the front of the vector and shifting to the right. This follows from
+    // from the structure of the time vector.
+    //
+    // See the theory documentation for further details.
     Eigen::MatrixXd TimeVector(
         const size_t polynomial_order, 
         const size_t derivative_order, 
@@ -63,7 +70,13 @@ namespace p4 {
       return coefficient_vec;
     }
 
-    // Generates a square matrix that is the integrated form of p(x)'p(x)
+    // Generates a square matrix that is the integrated form of d^n/dt^n [p(x)'p(x)].
+    // The derivative of this matrix can be easily calculated by computing the
+    // zeroth derivative of the matrix, padding the first n rows and columns
+    // with zeros, and shifting the matrix down and to the right by n
+    // rows/columns.
+    //
+    // See the theory documentation for further details.
     Eigen::MatrixXd QuadraticMatrix(
         const size_t polynomial_order,
         const size_t derivative_order,
@@ -366,7 +379,7 @@ namespace p4 {
     this->options_.Check();
 
     if(times.size() < 2) {
-      std::cerr << "PolynomialSolver::Run -- Too few times specified." << std::endl;
+      std::cerr << "PolynomialSolver::Run -- Time vector must have a size greater than one." << std::endl;
       std::exit(EXIT_FAILURE);
     }
 
@@ -394,30 +407,6 @@ namespace p4 {
     const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
 
     info.num_constraints = num_explicit_constraints + num_implicit_constraints;
-
-    /* The number of constraints is governed by the following rules:
-     * 1) The first node must be constrained by at least the 0th, 1st, and 2nd
-     *    derivatives: 
-     *      3*dimension constraints
-     * 2) Every other node must be constrained by at least the 0th derivative: 
-     *      1*(num_nodes - 1)*dimension constraints
-     * 3) The end of every segment must match the beginning of the next segment.
-     *    After propagating the initial node through the segment polynomial, the
-     *    resulting node should match the initial node of the next segment for
-     *    continuity_order derivatives.
-     *      num_segments*(continuity_order+1)*dimension constraints
-     *  4) Corridor Constraints: TODO
-     *      
-     */
-    // const size_t min_num_constraints = 0
-    //   + 3*info.num_dimensions 
-    //   + (info.num_nodes - 1)*info.num_dimensions
-    //   + info.num_segments*(info.continuity_order+1)*info.num_dimensions;
-
-    // if(info.num_constraints < min_num_constraints) {
-    //   std::cerr << "PolynomialSolver::Run -- Too few constraints." << std::endl;
-    //   std::exit(EXIT_FAILURE);
-    // }
 
     /*
      * CONSTRAINTS
@@ -554,17 +543,7 @@ namespace p4 {
 
   void PolynomialSolver::Options::Check() {
     if(this->num_dimensions < 1) {
-      std::cerr << "PolynomialSolver::Options::Run -- Dimension must be positive." << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
-  
-    if(this->polynomial_order < this->derivative_order + 3) {
-      std::cerr << "PolynomialSolver::Options::Run -- Polynomial order must be 3 or more orders greater than derivtive order." << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
-  
-    if(this->polynomial_order <= this->continuity_order) {
-      std::cerr << "PolynomialSolver::Options::Run -- Polynomial order must be greated than continuity order" << std::endl;
+      std::cerr << "PolynomialSolver::Options::Check -- Number of dimensions must be greater than zero." << std::endl;
       std::exit(EXIT_FAILURE);
     }
   }

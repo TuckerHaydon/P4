@@ -9,11 +9,13 @@ namespace p4 {
       return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
     }
 
-    // Computes a 'time vector'. A time vector has the form: 
-    //   [1/0! t^0, 1/1! t^1, 1/2! t^2, ...]
-    // or a specific derivative thereof, e.g. the first derivative
-    //   [0,        1/0! t^0, 1/1! t^1, ...]
-    // See the theory documentation for a deeper explanation.
+    // Constructs and takes the derivative of a vector of the form:
+    //   [ (1/0! dt^0), (1/1! dt^1), (1/2! dt^2) ... ]'
+    // The derivative can be efficiently easily calculated by prepadding zeros
+    // to the front of the vector and shifting to the right. This follows from
+    // from the structure of the time vector.
+    //
+    // See the theory documentation for further details.
     Eigen::MatrixXd TimeVector(
         const size_t polynomial_order, 
         const size_t derivative_order, 
@@ -98,5 +100,4 @@ namespace p4 {
     return samples;
 
   }
-
 }

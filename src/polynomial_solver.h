@@ -34,13 +34,14 @@ namespace p4 {
    * 2) continuity_order must be less than polynomial_order.
    * 3) state vector is ordered first by polynomial index, then by segment index,
    *    and finally by dimension index.
+   * 4) see theory documention for further information
    */
   class PolynomialSolver {
     public:
       // Options to configure the solver with
       struct Options {
         // Standard options
-        size_t num_dimensions = 0;
+        size_t num_dimensions   = 0;
         size_t polynomial_order = 0;
         size_t derivative_order = 0;
         size_t continuity_order = 0;
@@ -48,13 +49,14 @@ namespace p4 {
         // Number of intermediate points for segment inequality constraints
         size_t num_intermediate_points = 20;
 
-        // Solver options
-        bool polish = false;
-
         // Solver settings. These are freed after
         OSQPSettings osqp_settings;
   
-        Options() {}
+        Options() {
+          osqp_set_default_settings(&(this->osqp_settings));
+        }
+
+        // Evaluate whether the options are valid
         void Check();
       };
 

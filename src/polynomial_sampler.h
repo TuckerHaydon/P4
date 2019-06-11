@@ -29,8 +29,8 @@ namespace p4 {
 
       // Run the sampler. Requires a vector of times corresponding to the
       // polynomial waypoints, and the piecewise polynomial solution. Returns an
-      // Eigen matrix containing position samples. Rows indicate the dimension,
-      // cols indicate the sample index. The first element in each column is the
+      // Eigen matrix containing samples. Rows indicate the dimension, cols
+      // indicate the sample index. The first element in each column is the
       // sample time.
       Eigen::MatrixXd Run(const std::vector<double>& times, const PolynomialPath& path);
 

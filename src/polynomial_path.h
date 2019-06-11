@@ -15,12 +15,10 @@ namespace p4 {
     // number specifies the coefficient index.
     std::vector<Eigen::MatrixXd> coefficients;
 
-    // Returns the optimal cost of the optimization problem J = 0.5 * x'.P.x
-    double optimal_cost;
-
     // OSQP Output information. Contains information about whether a solution
     // was found, how long it took to find the solution, the optimal cost, etc.
     //   osqp_info.obj_val: the optimal cost of the optimization problem J = 0.5 * x'.P.x
+    // Reference: https://osqp.org/docs/interfaces/cc++#_CPPv48OSQPInfo
     OSQPInfo osqp_info;
   
     PolynomialPath(const std::vector<Eigen::MatrixXd>& coefficients_ = {})
