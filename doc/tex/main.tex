@@ -3,7 +3,7 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 
-\title{Piecewise Polynomial Path Planner ($P^4$)}
+\title{Piecewise Polynomial Path Planner (P4)}
 \author{Tucker Haydon}
 \date{Spring 2019}
 
@@ -12,17 +12,25 @@
 \maketitle
 
 \section{Introduction}
-This package is a C++ implementation of a piecewise-polynomial path-planner.
+This document describes the underlying theory for the piecewise polynomial path
+planner.
 
 \section{Polynomial Theory}
 \subsection{Problem Statement}
-Given a set of $m$, $k$-dimensional waypoints 
+Given a set of waypoints and corresponding arrival times, construct a
+piecewise-continuous polynomial trajectory through these waypoints that minimizes
+the norm of a specified derivative. Furthermore, the trajectory --- or any
+derivative of the trajectory --- may be subject to linear inequality
+constraints.
+\bigbreak
+\noindent Mathematically, the problem may be stated so: given a set of $m$ waypoints 
 %
 \begin{equation}
   \mathbf{W} = 
   \begin{bmatrix}
     \vec{w}_{0} & \vec{w}_{1} & \vec{w}_{2} & \hdots & \vec{w}_{m}
   \end{bmatrix}
+  \in \mathcal{R}^a
 \end{equation}
 %
 and a set of times to arrive at these waypoints 
@@ -33,48 +41,198 @@ and a set of times to arrive at these waypoints
   \end{bmatrix}
 \end{equation}
 %
-construct a set of $N$th-order piecewise polynomials that smoothly connect these waypoints
+determine a set of $n$'th-order piecewise-continuous polynomials that smoothly connect these waypoints
 %
 \begin{equation}
   \vec{p}(t) = 
   \begin{cases}
-    \sum_{n=0}^{N} p_{0,n} \cdot (\frac{1}{n!} t^{n}) & t_{0} \leq t < t_{1} \\ 
-    \sum_{n=0}^{N} p_{1,n} \cdot (\frac{1}{n!} t^{n}) & t_{1} \leq t < t_{2} \\ 
+    p_{0}(t) = \sum_{k=0}^{n} p_{0,k} \cdot (\frac{1}{k!} t^{k}) & t_{0} \leq t < t_{1} \\ 
+    p_{1}(t) = \sum_{k=0}^{n} p_{1,k} \cdot (\frac{1}{k!} t^{k}) & t_{1} \leq t < t_{2} \\ 
     \vdots \\
-    \sum_{n=0}^{N} p_{m,n} \cdot (\frac{1}{n!} t^{n}) & t_{m-1} \leq t < t_{m}
+    p_{m}(t) = \sum_{k=0}^{n} p_{m,k} \cdot (\frac{1}{k!} t^{k}) & t_{m-1} \leq t < t_{m}
   \end{cases}
 \end{equation}
 %
-while minimizing the squared norm of the $r$th derivative
+while minimizing the squared norm of the $r$'th derivative
 %
 \begin{equation}
   \min
   \int_{t_{0}}^{t_{m}} \frac{d^{r}}{dt^{r}}|| \vec{p}(t) ||^{2} dt
 \end{equation}
 %
-This problem construction and the following solution follow those of Mellinger
+subject to continuity and path constrains (see sections \ref{} \& \ref{}).
+\bigbreak
+\noindent This problem construction and the following solution follow those of Mellinger
 and Kumar \cite{mellinger2011minimum}.
 
-\subsection{Quadratic Programming}
-The problem of finding these piecewise polynomials can be cast as a quadratic
-programming problem:
-%
-\begin{equation}
-  \begin{split}
-    \min_{\vec{x}} \quad& \frac{1}{2} \vec{x}^T \mathbf{P} \vec{x}  \\
-    \text{s.t.} \quad& \vec{l} \leq \mathbf{A} \vec{x} \leq \vec{u}
-  \end{split}
-\end{equation}
-%
-\href{https://osqp.org}{OSQP} is used to solve the QP problem \cite{osqp}.
+\subsection{Polynomial Basis}
+Trajectories for quadcopters may be specified with no more than four independent
+dimensions: x, y, z, and yaw. Any more dimensions (roll, pitch) introduce
+constraints that may render certain specified trajectories infeasible. For
+example, a quadcopter cannot be simultaneously stationary and have a non-zero
+roll angle \cite{mellinger2011minimum}.
 
-\section{Scaling}
-Waypoint arrival times are arbitrary --- they can be as small as a millisecond
-or as large as a minute. In order to avoid numerical instability in the QP
-solver due to exponentiation of potentially large and small times, segment
-duration is normalized to unity. This normalized time is refered to as the
-`computation time'.
+Importantly, the x, y, z, and yaw dimensions may be specified
+\textit{independently}: each dimension of the polynomial basis functions may be
+considered alone, permitting scalar analysis. The following section uses a
+3rd-order polynomial, but the analysis generalized to any order polynomial.
 
+Consider a 3rd-order polynomial representing the first section of trajectory.
+\begin{equation*}
+  p_{0}(t) = \frac{1}{0!}t^{0}x_{0} + \frac{1}{1!}t^{1}v_{0}
+           + \frac{1}{2!}t^{2}a_{0} + \frac{1}{3!}t^{3}j_{0}
+\end{equation*}
+%
+This expression may be divided into two components: a vector of coefficients and
+a vector of basis functions.
+\begin{equation*}
+  p_{0}(t) = 
+  \underbrace{
+  \begin{bmatrix}
+    x_{0} & v_{0} & a_{0} & j_{0}
+  \end{bmatrix}
+  }_{\text{coefficients}}
+  \underbrace{
+  \begin{bmatrix}
+    \frac{t^{0}}{0!} \\[6pt]
+    \frac{t^{1}}{1!} \\[6pt]
+    \frac{t^{2}}{2!} \\[6pt]
+    \frac{t^{3}}{3!}
+  \end{bmatrix}
+  }_{\text{basis functions}}
+\end{equation*}
+%
+Or in vector form
+\begin{equation*}
+  p_{0}(t) = \vec{x}^{T} \vec{t}
+\end{equation*}
+
+\subsection{Polynomial Optimization}
+For each section in the trajectory, the $r$'th derivative must be minimized.
+\begin{align*}
+    x_{i} &= \text{arg} \min_{\vec{x}} \int_{t_{i}}^{t_{i+1}} \bigg[ \frac{d^{r}
+    p(\tau)}{d \tau^{r}} \bigg]^2 dt \\
+        &= \text{arg} \min_{\vec{x}} \int_{t_{i}}^{t_{i+1}} \bigg[ \frac{d^{r}
+    p(\tau)}{d \tau^{r}}\bigg]^T \bigg[ \frac{d^{r} p(\tau)}{d \tau^{r}}\bigg]
+    dt \\
+        &= \text{arg} \min_{\vec{x}} \int_{t_{i}}^{t_{i+1}} \vec{x}^T \frac{d^{r}
+    \vec{t}(\tau)}{d \tau^{r}}^{T} \frac{d^{r} \vec{t}(\tau)}{d \tau^{r}}
+    \vec{x} dt \\
+        &= \text{arg} \min_{\vec{x}} \vec{x}^{T} \int_{t_{i}}^{t_{i+1}} \frac{d^{r}
+    \vec{t}(\tau)}{d \tau^{r}}^{T} \frac{d^{r} \vec{t}(\tau)}{d \tau^{r}} dt
+    \vec{x}
+\end{align*}
+%
+By defining
+\begin{equation*}
+  \mathbf{Q} = \int_{t_{i}}^{t_{i+1}} \frac{d^{r} \vec{t}(\tau)}{d
+  \tau^{r}}^{T} \frac{d^{r} \vec{t}(\tau)}{d \tau^{r}} dt
+\end{equation*}
+%
+and noting that the time-varying components will be integrated out by the
+definite integral, the optimization problem may be written as
+\begin{equation*}
+  x_{i} = \text{arg} \min_{\vec{x}} \vec{x}^{T} \mathbf{Q} \vec{x}
+\end{equation*}
+%
+The structure of the integrand of $\mathbf{Q}$ is revealed by first computing the initial couple
+derivatives of $\vec{t}(\tau)$.
+\begin{align*}
+  \vec{t(\tau)} &= 
+  \begin{bmatrix}
+    \frac{\tau^{0}}{0!} & \frac{\tau^{1}}{1!} & \frac{\tau^{2}}{2!} & \hdots
+  \end{bmatrix} \\
+  \frac{d \vec{t(\tau)}}{d\tau} &= 
+  \begin{bmatrix}
+    0 & \frac{\tau^{0}}{0!} & \frac{\tau^{1}}{1!} & \hdots
+  \end{bmatrix} \\
+  \frac{d^{2} \vec{t(\tau)}}{d\tau^{2}} &= 
+  \begin{bmatrix}
+    0 & 0 & \frac{\tau^{0}}{0!} & \hdots
+  \end{bmatrix} \\
+\end{align*}
+%
+Notice that successive derivatives pre-pad zeros and shift the vector
+to the right. 
+
+The integrand of $\mathbf{Q}$ is found by taking the outer product of the
+derivative of the time vector with itself.
+\begin{align*}
+  \vec{t(\tau)}^{T} \vec{t(\tau)} &= 
+  \begin{bmatrix}
+    \frac{t^{0}}{0!} \frac{t^{0}}{0!} & \frac{t^{0}}{0!} \frac{t^{1}}{1!} &
+    \frac{t^{0}}{0!} \frac{t^{2}}{2!}  & \hdots \\[6pt]
+    \frac{t^{1}}{1!} \frac{t^{0}}{0!} & \frac{t^{1}}{1!} \frac{t^{1}}{1!} &
+    \frac{t^{1}}{1!} \frac{t^{2}}{2!}  & \hdots \\[6pt]
+    \frac{t^{2}}{2!} \frac{t^{0}}{0!} & \frac{t^{2}}{2!} \frac{t^{1}}{1!} &
+    \frac{t^{2}}{2!} \frac{t^{2}}{2!}  & \hdots \\[6pt]
+    \vdots & \vdots & \vdots & \ddots
+  \end{bmatrix} \\
+  \frac{d\vec{t(\tau)}}{d\tau}^{T} \frac{d\vec{t(\tau)}}{d\tau} &= 
+  \begin{bmatrix}
+    0 & 0 & 0 & \hdots \\[6pt]
+    0 & \frac{t^{0}}{0!} \frac{t^{0}}{0!} & \frac{t^{0}}{0!} \frac{t^{1}}{1!} & \hdots \\[6pt]
+    0 & \frac{t^{1}}{1!} \frac{t^{0}}{0!} & \frac{t^{1}}{1!} \frac{t^{1}}{1!} & \hdots \\[6pt]
+    \vdots & \vdots & \vdots & \ddots
+  \end{bmatrix} \\
+  \frac{d^{2}\vec{t(\tau)}}{d\tau^{2}}^{T} \frac{d^{2}\vec{t(\tau)}}{d\tau^{2}} &= 
+  \begin{bmatrix}
+    0 & 0 & 0 & \hdots \\[6pt]
+    0 & 0 & 0 & \hdots \\[6pt]
+    0 & 0 & \frac{t^{0}}{0!} \frac{t^{0}}{0!} & \hdots \\[6pt]
+    \vdots & \vdots & \vdots & \ddots
+  \end{bmatrix} \\
+\end{align*}
+% 
+Notice that the outer product of successive derivatives pre-pads columns and rows
+with zeros and shift rows down and columns to the right. This admits a
+convenient way to compute the integrand of $\mathbf{Q}$: take the outer product of
+$\vec{t}(\tau)$ with itself and shift the rows and columns by the power of the
+derivative.
+\begin{equation*}
+  \frac{d^{r}\vec{t(\tau)}}{d\tau^{r}}^{T} \frac{d^{r}\vec{t(\tau)}}{d\tau^{r}}
+  = \text{shift}(\vec{t}(\tau)^{T} \vec{t}(\tau), r) 
+\end{equation*}
+\\
+To compute $\mathbf{Q}$, the matrix integrand must be integrated. Integrating a
+matrix is as easy as integrating its components element-wise. The polynomial
+structure of the components of $\mathbf{Q}$ admit and easy-to-compute integral
+formula:
+\begin{equation*}
+  \int \frac{\tau^{i}}{i!} \frac{\tau^{j}}{j!} d\tau =
+  \frac{\tau^{i+j+1}}{i!j!(i+j+1)!}
+\end{equation*}
+\\
+Finally, a careful observer might note that the structure of problem permits one
+to swap the shift and integrate operations. Instead of shifting all elements and
+then integrating, one could integrate all elements and then shift. This
+simplifies implementation in a for-loop-based subroutine.
+\bigbreak
+\noindent In summary, to compute $\mathbf{Q}$:
+\begin{enumerate}
+  \item Compute the outer product of $\vec{t}(\tau)$ with itself
+  \item Integrate the outer product
+  \item Shift the rows and columns of the integrated matrix by the order of the
+    derivative
+\end{enumerate}
+
+\subsection{Relaxing Arrival Time}
+Until this point, one very important topic has been overlooked: timing. Users
+may specify arbitrary arrival times for waypoints. When times are too large, too
+small, or a combination of the both, numerical accuracy problems occur and many
+optimizers struggle to find sufficiently accurate solutions. To prevent this
+from occurring, segment time is normalized to $t \in [0,1]$. Stated otherwise,
+every segment in a trajectory is assumed to start at $t=0$ and end at $t=1$.
+
+
+This new timing scheme is referred to as the \textit{computational time} while
+the original timing scheme is referred to as the \textit{physical time}.
+Transforming the problem from physical time to computational time requires one
+to determine the segment index a particular time is, subtracting the start time,
+and normalized by the total segment time. The inverse transform is defined in a
+similar manner.
+
+\subsection{Time Scaling}
 Let $t \in [0, t_{f}]$ represent the physical time along a segment and $\tau \in
 [0, 1]$ represent the computational time along a segment. The two are related by
 a scaling factor.
@@ -83,41 +241,126 @@ a scaling factor.
   t = \alpha \tau
 \end{equation}
 %
-Path constraints are specified using physical time. These must be converted to
-constraints in computational time. Define a constraint:
+Path constraints are specified using physical time, but the polynomial functions
+and optimization use computational time. These two timing schemes must be
+reconciled. Let a constraint be defined as:
 %
-\begin{equation}
-  \frac{dP(t/\alpha)}{dt} < \kappa
-\end{equation}
+\begin{equation*}
+  \frac{dp(\tau)}{dt} < \kappa
+\end{equation*}
 %
 Change of basis using $\tau = t / \alpha$ and $d\tau = dt / \alpha$. Substitute
 and rearrange:
 %
 \begin{equation}
-  \frac{dP(\tau)}{d\tau} < \alpha \kappa
+  \frac{dp(\tau)}{d\tau} < \alpha \kappa
 \end{equation}
 %
 Constraints on higher derivatives are derived using the same process.
 \begin{equation}
-  \frac{dP^{n}(t/\alpha)}{dt^{n}} < \kappa \rightarrow
-  \frac{dP^{n}(\tau)}{d\tau^{n}} < \alpha^{n} \kappa
+  \frac{dp^{n}(\tau)}{dt^{n}} < \kappa \rightarrow
+  \frac{dp^{n}(\tau)}{d\tau^{n}} < \alpha^{n} \kappa
 \end{equation}
 %
-Continuity constraints merit special consideration. These constraints require
-that the $n$th derivative of the end of a segment match the $n$th derivative of
-the following segment. Since the time scaling of each segment may be different,
-the constraint manifests so:
+Continuity constraints (discussed in the next section) merit special
+consideration. These constraints require that the $n$th derivative of the end of
+a segment match the $n$th derivative of the following segment. Since the time
+scaling of each segment may be different, the constraint manifests so:
 \begin{equation}
-  \frac{dP_{k}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k}^{n}} =
-  \frac{dP_{k+1}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k+1}^{n}}
+  \frac{dp_{k}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k}^{n}} =
+  \frac{dp_{k+1}^{n}(\tau)}{d\tau^{n}} \frac{1}{\alpha_{k+1}^{n}}
 \end{equation}
 
-\section{Usage Notes}
-\begin{enumerate}
-  \item The polynomial order must be greater than 1.
-  \item The position, velocity, and acceleration for the initial node must all
-    be specified. 
-\end{enumerate}
+\subsection{Continuity Constraints}
+Most piecewise-continuous problems require some sort of continuity --- the
+position, velocity, or acceleration must not instantaneously change at endpoints
+of the piecewise trajectory. Typically this is motivated by real-life
+constraints: a quadcopter cannot instantaneously change teleport or change its
+velocity from 1 m/s to -3 m/s.
+
+Consider the first two segments of a scaler third-order piecewise polynomial
+trajectory. Let the optimization vector contain the coefficients for both
+segments of the trajectory.
+\begin{equation*}
+  \vec{x} =
+  \begin{bmatrix}
+    x_{0} & v_{0} & a_{0} & j_{0} & x_{1} & v_{1} & a_{1} & j_{1}
+  \end{bmatrix}^{T}
+\end{equation*}
+%
+The new quadratic matrix is a block-diagonal of the segment quadratic matrices.
+\begin{equation*}
+  \mathbf{Q} = 
+  \begin{bmatrix}
+    \mathbf{Q}_{0} & \mathbf{0} \\
+    \mathbf{0} & \mathbf{Q}_{1}
+  \end{bmatrix}
+\end{equation*}
+%
+The new optimization function is:
+\begin{equation*}
+  J = \vec{x}^T \mathbf{Q} \vec{x}
+\end{equation*}
+
+For the function to be continuous, the first segment must be equal to the second
+segment at the boundary point.
+\begin{equation*}
+  p_{0}(t=1) - p_{1}(t=0) = 0 \\
+\end{equation*}
+%
+Written in matrix form:
+\begin{equation*}
+  \underbrace{
+  \begin{bmatrix}
+    1/0! & 1/1! & 1/2! & 1/3! & -1/0! & 0 & 0 & 0 \\ 
+  \end{bmatrix}
+  }_{\mathbf{A}}
+  \underbrace{
+  \begin{bmatrix}
+    x_{0} \\ 
+    v_{0} \\
+    a_{0} \\
+    j_{0} \\
+    x_{1} \\
+    v_{1} \\
+    a_{1} \\
+    j_{1}
+  \end{bmatrix}
+  }_{\vec{x}}
+  =
+  \vec{0}
+\end{equation*}
+%
+Or equivalently
+\begin{equation*}
+  \vec{l} \leq \mathbf{A} \vec{x} \leq \vec{u}
+\end{equation*}
+%
+where both $\vec{l}$ and $\vec{u}$ are $\vec{0}$ in this case. Continuity
+constraints for arbitrary derivatives may be specified in a similar manner by
+leveraging the fact that the derivative of $\vec{t}$ is a shifted version of
+itself. The derivatives may be formulated in the same $\vec{l} \leq < \mathbf{A}
+\vec{x} \leq \vec{u}$. Without further justification, all continuity and
+waypoint constraints may be formulated as bounded linear constraints.
+
+
+\subsection{Path Constraints}
+TODO
+
+
+
+\subsection{Quadratic Programming}
+The problem of finding these piecewise polynomials can be cast as a quadratic
+programming problem:
+%
+\begin{equation}
+  \begin{split}
+    \min_{\vec{x}} \quad& \frac{1}{2} \vec{x}^T \mathbf{Q} \vec{x}  \\
+    \text{s.t.} \quad& \vec{l} \leq \mathbf{A} \vec{x} \leq \vec{u}
+  \end{split}
+\end{equation}
+%
+\href{https://osqp.org}{OSQP} is used to solve the QP problem \cite{osqp}.
 
 \bibliography{main}
 \bibliographystyle{IEEEtran}
