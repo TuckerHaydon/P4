@@ -75,7 +75,7 @@ roll angle \cite{mellinger2011minimum}.
 Importantly, the x, y, z, and yaw dimensions may be specified
 \textit{independently}: each dimension of the polynomial basis functions may be
 considered alone, permitting scalar analysis. The following section uses a
-3rd-order polynomial, but the analysis generalized to any order polynomial.
+3rd-order polynomial, but the analysis generalizes to any order polynomial.
 
 Consider a 3rd-order polynomial representing the first section of trajectory.
 \begin{equation*}
@@ -275,7 +275,7 @@ scaling of each segment may be different, the constraint manifests so:
 Most piecewise-continuous problems require some sort of continuity --- the
 position, velocity, or acceleration must not instantaneously change at endpoints
 of the piecewise trajectory. Typically this is motivated by real-life
-constraints: a quadcopter cannot instantaneously change teleport or change its
+constraints: a quadcopter cannot instantaneously teleport or change its
 velocity from 1 m/s to -3 m/s.
 
 Consider the first two segments of a scaler third-order piecewise polynomial
@@ -339,13 +339,53 @@ Or equivalently
 where both $\vec{l}$ and $\vec{u}$ are $\vec{0}$ in this case. Continuity
 constraints for arbitrary derivatives may be specified in a similar manner by
 leveraging the fact that the derivative of $\vec{t}$ is a shifted version of
-itself. The derivatives may be formulated in the same $\vec{l} \leq < \mathbf{A}
+itself. The derivatives may be formulated in the same $\vec{l} \leq \mathbf{A}
 \vec{x} \leq \vec{u}$. Without further justification, all continuity and
 waypoint constraints may be formulated as bounded linear constraints.
 
 
 \subsection{Path Constraints}
-TODO
+Path constraints are necessary for any non-trivial path. For example, quadcopters
+often have input constraints and can't fly faster than or accelerate faster than
+a certain limit. Alternatively, if obstacles are present, the position of the
+path should be constrained to be outside of obstacles.
+
+In coordination with the continuity constraints, path constraints can be
+formulated in the form:
+\begin{equation*}
+  \vec{l} \leq \mathbf{A} \vec{x} \leq \vec{u}
+\end{equation*}
+Unfortunately, these constraints are linear --- they cannot be used to describe
+non-linear constraints. For example, if a quadcopter is limited to a total
+acceleration of 0.5 m/$s^2$, then the two-norm magnitude of its acceleration
+should be bounded. The two-norm magnitude is a non-linear constraint and cannot
+be expressed. However, one could approximate it by specifying an arbitrary number of planes
+tangent-to or inscribed-in the hypersphere that delimits the two-norm. It's not
+perfect, but it enables the quadratic programming solver to find a solution
+fast.
+
+Finally, path constraints introduce one additional complication: violation of
+dimensional independence. Previously, I claimed that the dimensions are
+independent and thus can be considered standalone as scalar polynomials. In the
+presence of path constraints, this is not necessarily true. Two dimensions can
+be linked together by a path constraint. For example, consider approximating a
+two-norm magnitude by requiring:
+\begin{align*}
+  x + y &< 1 \\
+  x - y &< 1 \\
+  -x + y &< 1 \\
+  -x - y &< 1
+\end{align*}
+Clearly these two dimensions are now linked. Despite this dependency, the scalar
+analysis still holds. The dependency is managed by the quadratic programming
+solver.
+
+One last note: if there were no interdimensional dependence, a multi-dimensional
+problem could be broken down into multiple scalar dimensional problems and
+solved simultaneously by multiple solvers distributed over multiple threads.
+However, it's usually the case that at least one path constraint introduces
+interdimensional dependence and this technique cannot be leveraged.
+
 
 
 
