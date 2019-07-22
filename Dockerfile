@@ -14,9 +14,9 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     liblapack-dev
 
 # Install project
-RUN mkdir -p /workspace/ &&\
-    cd /workspace
-RUN git clone https://github.com/tuckerhaydon/P4.git && \
+RUN mkdir -p /workspace/
+RUN cd /workspace && \
+    git clone https://github.com/tuckerhaydon/P4.git && \
     cd P4 && \
     git submodule update --init --recursive
 ENV P4=/workspace/P4
