@@ -1,0 +1,6 @@
+[submodule "dependencies/osqp"]
+	path = dependencies/osqp
+	url = https://github.com/oxfordcontrol/osqp
+[submodule "dependencies/eigen"]
+	path = dependencies/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror
