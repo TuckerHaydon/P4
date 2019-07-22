@@ -13,47 +13,32 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     libblas-dev \ 
     liblapack-dev
 
-# Make workspace directory
-RUN mkdir /workspace
-
-# Install libraries
-RUN mkdir -p /workspace/libs
-WORKDIR /workspace/libs
-
-RUN git clone https://github.com/eigenteam/eigen-git-mirror.git eigen && \
-    cd eigen && \
-    git checkout tags/3.3.7 && \
+# Install project
+RUN mkdir -p /workspace/ &&\
+    cd /workspace
+RUN git clone https://github.com/tuckerhaydon/P4.git && \
+    cd P4 && \
+    git submodule update --init --recursive
+ENV P4=/workspace/P4
+RUN cd $P4/dependencies/eigen && \
     mkdir build && \
     cd build && \
     cmake .. && \
-    cmake --build . && \
+    make && \
     make install
-
-RUN git clone https://github.com/oxfordcontrol/osqp.git && \
-    cd osqp && \
-    git submodule update --init --recursive && \
+RUN cd $P4/dependencies/osqp && \
     mkdir build && \
     cd build && \
     cmake -G "Unix Makefiles" .. && \
-    make && \
+    cmake --build . && \
     make install
-
-# Install project
-RUN mkdir -p /workspace/P4
-WORKDIR /workspace/P4
-
-COPY CMakeLists.txt /workspace/P4/
-COPY src /workspace/P4/src/
-COPY examples /workspace/P4/examples
-
-RUN mkdir -p build && \
-    cd build && \
+RUN mkdir -p $P4/build && \
+    cd $P4/build && \
     cmake .. && \
     make
 
 # Log in directly to binaries
-WORKDIR /workspace/P4/build/examples
+WORKDIR $P4/build/examples
 
 # Startup
 CMD ["/bin/bash"]
-
