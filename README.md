@@ -159,6 +159,13 @@ cd build/examples
 ## Linking
 Builds a shared library called lib_p4.
 
+## Docker
+For a quick build and test, consider using the included docker file. It's not
+set up to attach to a display, so the 3D example is not built by default.
+```
+docker build --tag=p4 . && docker run -it p4
+```
+
 ## Documentation
 The theoretical documentation is written in LaTex. Latex must be installed
 before building the pdf.
