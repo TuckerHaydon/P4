@@ -245,8 +245,18 @@ namespace p4 {
         }
       }
 
-      // Include start- and end-points in segment bounds
-      const double dt = 1.0 / (info.num_intermediate_points - 2);
+      // Include start- and end-points in segment constraints. When constraining
+      // a segment, also constrain the endpoints of the segment to the same
+      // value. If this were not the case, the following situation could occur:
+      // the start endpoint is constrained to -2, but the following segment is
+      // constrained above zero. Clearly, there is no smooth solution that
+      // permits this. 
+      // 
+      // Add two to account for the endpoints and then remove one to convert
+      // from the number of points the the number of segments. Divide the
+      // segment length (1) by the number of segments to get the length of each
+      // intermediate segment.
+      const double dt = 1.0 / (info.num_intermediate_points + 2 - 1);
 
       // Segment lower bound constraints
       for(const SegmentInequalityBound& bound: explicit_segment_inequality_bounds) {
@@ -259,7 +269,7 @@ namespace p4 {
           lower_bound_vec(constraint_idx,0) = -SegmentInequalityBound::INFTY;
           upper_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, bound.derivative_idx);
 
-          // Start point not included
+          // Time at a specific point
           double time = point_idx * dt;
 
           Eigen::MatrixXd segment_propagation_coefficients;
