@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   solver_options.osqp_settings.verbose = true;     // Suppress the printout
 
   PolynomialSolver solver(solver_options);
-  const PolynomialPath path
+  const PolynomialSolver::Solution solution
     = solver.Run(times, equality_bounds,{},{});
 
   return EXIT_SUCCESS;

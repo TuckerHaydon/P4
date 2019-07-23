@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 
   // Solve
   PolynomialSolver solver(solver_options);
-  const PolynomialPath path
+  const PolynomialSolver::Solution solution
     = solver.Run(
         times, 
         node_equality_bounds,
@@ -73,9 +73,9 @@ int main(int argc, char** argv) {
 
   // Print some output info
   // Reference: https://osqp.org/docs/interfaces/cc++#info
-  std::cout << "Status:                    " << path.osqp_info.status << std::endl;
-  std::cout << "Status Val (1 == success): " << path.osqp_info.status_val << std::endl;
-  std::cout << "Optimal Cost:              " << path.osqp_info.obj_val << std::endl;
+  std::cout << "Status:                    " << solution.workspace->info->status << std::endl;
+  std::cout << "Status Val (1 == success): " << solution.workspace->info->status_val << std::endl;
+  std::cout << "Optimal Cost:              " << solution.workspace->info->obj_val << std::endl;
 
   // Sampling and Plotting
   { // Plot acceleration profiles
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     sampler_options.derivative_order = 2;
 
     PolynomialSampler sampler(sampler_options);
-    Eigen::MatrixXd samples = sampler.Run(times, path);
+    Eigen::MatrixXd samples = sampler.Run(times, solution);
 
     std::vector<double> t_hist, x_hist, y_hist, z_hist;
     for(size_t time_idx = 0; time_idx < samples.cols(); ++time_idx) {
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
     sampler_options.derivative_order = 1;
 
     PolynomialSampler sampler(sampler_options);
-    Eigen::MatrixXd samples = sampler.Run(times, path);
+    Eigen::MatrixXd samples = sampler.Run(times, solution);
 
     std::vector<double> t_hist, x_hist, y_hist, z_hist;
     for(size_t time_idx = 0; time_idx < samples.cols(); ++time_idx) {
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
     sampler_options.derivative_order = 0;
 
     PolynomialSampler sampler(sampler_options);
-    Eigen::MatrixXd samples = sampler.Run(times, path);
+    Eigen::MatrixXd samples = sampler.Run(times, solution);
 
     std::vector<double> t_hist, x_hist, y_hist, z_hist;
     for(size_t time_idx = 0; time_idx < samples.cols(); ++time_idx) {

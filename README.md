@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
 
   // Solve
   PolynomialSolver solver(solver_options);
-  const PolynomialPath path
+  const PolynomialSolver::Solution solution
     = solver.Run(
         times, 
         node_equality_bounds,
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
   sampler_options.derivative_order = 2;
 
   PolynomialSampler sampler(sampler_options);
-  Eigen::MatrixXd samples = sampler.Run(times, path);
+  Eigen::MatrixXd samples = sampler.Run(times, solution);
 ```
 
 ![](doc/img/trajectory.svg "Trajectory") 

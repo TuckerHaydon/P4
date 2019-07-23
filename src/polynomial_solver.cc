@@ -370,7 +370,7 @@ namespace p4 {
   }
 
 
-  PolynomialPath PolynomialSolver::Run(
+  PolynomialSolver::Solution PolynomialSolver::Run(
       const std::vector<double>& times,
       const std::vector<NodeEqualityBound>& explicit_node_equality_bounds,
       const std::vector<NodeInequalityBound>& explicit_node_inequality_bounds,
@@ -471,12 +471,13 @@ namespace p4 {
     /*
      * RUN THE SOLVER
      */
-    // Structures
-    OSQPWorkspace* work;
-    OSQPData* data;  
-
-    // Populate data
-    data = (OSQPData*)c_malloc(sizeof(OSQPData));
+    // Allocate and populate data
+    std::shared_ptr<OSQPData> data = std::shared_ptr<OSQPData>(
+        (OSQPData *)c_malloc(sizeof(OSQPData)),
+        [](OSQPData* data) {
+          c_free(data->A);
+          c_free(data->P);
+        });
     data->n = info.total_num_params;
     data->m = info.num_constraints;
     data->P = P;
@@ -485,59 +486,22 @@ namespace p4 {
     data->l = l;
     data->u = u;
 
-    // Setup workspace
-    work = osqp_setup(data, &this->options_.osqp_settings);
+    // Allocate and prepare workspace
+    // Workspace shared pointer requires custom destructor
+    PolynomialSolver::Solution solution;
+    solution.num_dimensions   = info.num_dimensions;
+    solution.polynomial_order = info.polynomial_order;
+    solution.num_nodes        = info.num_nodes;
+    solution.workspace =  std::shared_ptr<OSQPWorkspace>(
+        osqp_setup(data.get(), &this->options_.osqp_settings),
+        [](OSQPWorkspace* workspace) { 
+          osqp_cleanup(workspace);
+        });
 
-    // Solve Problem
-    osqp_solve(work);
+    // Solve
+    osqp_solve(solution.workspace.get());
 
-    /*
-     * SOLUTION
-     */
-    PolynomialPath solution;
-    solution.osqp_info = *work->info;
-
-    // Ensure a solution is found before copying nonsense data
-    if(1 != solution.osqp_info.status_val) {
-      // Solution not found
-      return solution;
-    }
-
-    // Else copy the coefficients
-    solution.coefficients.reserve(info.num_dimensions);
-    for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
-      // Allocate dynamic matrix
-      solution.coefficients.emplace_back();
-      solution.coefficients[dimension_idx].resize(info.num_params_per_node_per_dim, info.num_nodes);
-      solution.coefficients[dimension_idx].fill(0);
-
-      for(size_t node_idx = 0; node_idx < info.num_nodes; ++node_idx) {
-        Eigen::MatrixXd coefficients;
-        coefficients.resize(info.num_params_per_node_per_dim, 1);
-        coefficients.fill(0);
-        for(size_t coefficient_idx = 0; coefficient_idx < info.num_params_per_node_per_dim; ++coefficient_idx) {
-          const size_t parameter_idx = 0
-            // Get to the right dimension
-            + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
-            // Get to the right node
-            + info.num_params_per_node_per_dim * node_idx
-            // Get to the right parameter idx
-            + coefficient_idx;
-          coefficients(coefficient_idx, 0)
-           = work->solution->x[parameter_idx];
-        }
-
-        solution.coefficients[dimension_idx].col(node_idx) = coefficients;
-      }
-    }
-
-
-    // Cleanup
-    osqp_cleanup(work);
-    c_free(data->A);
-    c_free(data->P);
-    c_free(data);
-
+    // Return the solution
     return solution;
   }
 
@@ -546,6 +510,66 @@ namespace p4 {
       std::cerr << "PolynomialSolver::Options::Check -- Number of dimensions must be greater than zero." << std::endl;
       std::exit(EXIT_FAILURE);
     }
+  }
+
+  std::vector<std::vector<Eigen::VectorXd>> PolynomialSolver::Solution::Coefficients() const {
+    const size_t num_segments                   = this->num_nodes - 1;
+    const size_t num_params_per_node_per_dim    = this->polynomial_order + 1;
+    const size_t num_params_per_segment_per_dim = this->polynomial_order + 1;
+    const size_t num_params_per_node            = this->num_dimensions * num_params_per_node_per_dim;
+    const size_t num_params_per_segment         = this->num_dimensions * num_params_per_segment_per_dim;
+    const size_t total_num_params               = this->num_nodes * num_params_per_node;
+
+    std::vector<std::vector<Eigen::VectorXd>> coefficients;
+
+    coefficients.resize(this->num_dimensions);
+    for(size_t dimension_idx = 0; dimension_idx < this->num_dimensions; ++dimension_idx) {
+      coefficients[dimension_idx].resize(this->num_nodes);
+      for(size_t node_idx = 0; node_idx < this->num_nodes; ++node_idx) {
+        coefficients[dimension_idx][node_idx].resize(num_params_per_node_per_dim);
+        for(size_t coefficient_idx = 0; coefficient_idx < num_params_per_node_per_dim; ++coefficient_idx) {
+          const size_t parameter_idx = 0
+            // Get to the right dimension
+            + num_params_per_node_per_dim * this->num_nodes * dimension_idx
+            // Get to the right node
+            + num_params_per_node_per_dim * node_idx
+            // Get to the right parameter idx
+            + coefficient_idx;
+
+          coefficients[dimension_idx][node_idx](coefficient_idx)
+            = this->workspace->solution->x[parameter_idx];
+        }
+      }
+    }
+    return coefficients;
+  }
+
+  Eigen::VectorXd PolynomialSolver::Solution::Coefficients(
+      const size_t dimension_idx, 
+      const size_t node_idx) const {
+    const size_t num_segments                   = this->num_nodes - 1;
+    const size_t num_params_per_node_per_dim    = this->polynomial_order + 1;
+    const size_t num_params_per_segment_per_dim = this->polynomial_order + 1;
+    const size_t num_params_per_node            = this->num_dimensions * num_params_per_node_per_dim;
+    const size_t num_params_per_segment         = this->num_dimensions * num_params_per_segment_per_dim;
+    const size_t total_num_params               = this->num_nodes * num_params_per_node;
+
+    Eigen::VectorXd coefficients;
+    coefficients.resize(num_params_per_node_per_dim);
+    for(size_t coefficient_idx = 0; coefficient_idx < num_params_per_node_per_dim; ++coefficient_idx) {
+      const size_t parameter_idx = 0
+        // Get to the right dimension
+        + num_params_per_node_per_dim * this->num_nodes * dimension_idx
+        // Get to the right node
+        + num_params_per_node_per_dim * node_idx
+        // Get to the right parameter idx
+        + coefficient_idx;
+
+      coefficients(coefficient_idx)
+        = this->workspace->solution->x[parameter_idx];
+    }
+
+    return coefficients;
   }
 }
 

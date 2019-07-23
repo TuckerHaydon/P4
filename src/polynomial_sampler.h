@@ -3,10 +3,9 @@
 #pragma once
 
 #include <Eigen/Dense>
-
 #include <vector>
 
-#include "polynomial_path.h"
+#include "polynomial_solver.h"
 
 namespace p4 {
   // Class that samples the piecewise polynomial solution.
@@ -32,7 +31,9 @@ namespace p4 {
       // Eigen matrix containing samples. Rows indicate the dimension, cols
       // indicate the sample index. The first element in each column is the
       // sample time.
-      Eigen::MatrixXd Run(const std::vector<double>& times, const PolynomialPath& path);
+      Eigen::MatrixXd Run(
+          const std::vector<double>& times, 
+          const PolynomialSolver::Solution& solution);
 
     private:
       Options options_;

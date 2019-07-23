@@ -46,18 +46,21 @@ namespace p4 {
     
       return coefficient_vec;
     }
-
   }
 
   // Sample a polynomial path solution
   Eigen::MatrixXd PolynomialSampler::Run(
       const std::vector<double>& times,
-      const PolynomialPath& path) {
+      const PolynomialSolver::Solution& solution) {
+
+    // Reshape solution into usable data structure
+    std::vector<std::vector<Eigen::VectorXd>> coefficients =
+      solution.Coefficients();
 
     // Helper constants
-    const size_t num_dimensions = path.coefficients.size();
-    const size_t num_nodes = path.coefficients[0].cols();
-    const size_t polynomial_order = path.coefficients[0].rows() - 1;
+    const size_t num_dimensions = solution.num_dimensions;
+    const size_t num_nodes = solution.num_nodes;
+    const size_t polynomial_order = solution.polynomial_order;
     const size_t num_samples 
       = static_cast<size_t>((times.back() - times.front()) * this->options_.frequency);
 
@@ -85,8 +88,8 @@ namespace p4 {
         const double t = path_time - times[node_idx];
         const double tau = t / alpha;
 
-        const Eigen::MatrixXd polynomial_coefficients 
-          = path.coefficients[dimension_idx].col(node_idx);
+        const Eigen::VectorXd polynomial_coefficients 
+          = coefficients[dimension_idx][node_idx];
         const Eigen::MatrixXd tau_vec
           = TimeVector(polynomial_order, this->options_.derivative_order, tau);
 
@@ -96,8 +99,6 @@ namespace p4 {
           / std::pow(alpha, this->options_.derivative_order);
       }
     }
-
     return samples;
-
   }
 }

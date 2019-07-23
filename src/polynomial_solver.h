@@ -3,9 +3,9 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include "polynomial_bounds.h"
-#include "polynomial_path.h"
 
 namespace p4 {
   /* Class for solving piecewise polynomial fitting & minimization problems.
@@ -60,10 +60,41 @@ namespace p4 {
         void Check();
       };
 
+      // Structure wrapping important information about the OSQP solution
+      struct Solution {
+        // Heap-allocated shared pointer to an OSQPWorkspace instance. Must
+        // define a custom destructor for cleanup.
+        // Important includes:
+        //   a) workspace.info.obj_val: the optimal cost of the optimization
+        //   problem: J = 0.5 * x' * P * x
+        //   b) workspace.solution: solution and lagrange multipliers
+        // Resources: 
+        //   a) https://osqp.org/docs/interfaces/cc++#workspace
+        std::shared_ptr<OSQPWorkspace> workspace = nullptr;
+
+        // Required
+        size_t num_dimensions   = 0;
+        size_t polynomial_order = 0;
+        size_t num_nodes        = 0;
+
+        Solution() {};
+
+        // Reshapes the coefficients of the OSQP solution into a more usable
+        // format. Returns a 3D data structure with the following format:
+        // [dimension_idx][segment_idx][coefficient_idx]
+        std::vector<std::vector<Eigen::VectorXd>> Coefficients() const;
+
+        // Returns an Eigen vector containing the coefficients for a specified
+        // dimension and segment index.
+        Eigen::VectorXd Coefficients(
+            const size_t dimension_idx, 
+            const size_t node_idx) const;
+      };
+
       PolynomialSolver(const Options& options = Options())
         : options_(options) {}
   
-      PolynomialPath Run(
+      Solution Run(
           const std::vector<double>& times,
           const std::vector<NodeEqualityBound>& node_equality_bounds,
           const std::vector<NodeInequalityBound>& node_inequality_bounds,
