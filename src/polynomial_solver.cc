@@ -9,10 +9,12 @@
 #include <osqp.h>
 
 #include "polynomial_solver.h"
+#include "common.h"
 
 namespace p4 {
   namespace {
-    struct Info {   
+    // Helper structure that contains pre-computed constants
+    struct Constants {   
       size_t num_dimensions;
       size_t polynomial_order;
       size_t derivative_order;
@@ -27,48 +29,6 @@ namespace p4 {
       size_t total_num_params;
       size_t num_constraints;
     };
-
-    size_t factorial(size_t n) {
-      return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
-    }
-
-    // Constructs and takes the derivative of a vector of the form:
-    //   [ (1/0! dt^0), (1/1! dt^1), (1/2! dt^2) ... ]'
-    // The derivative can be efficiently easily calculated by prepadding zeros
-    // to the front of the vector and shifting to the right. This follows from
-    // from the structure of the time vector.
-    //
-    // See the theory documentation for further details.
-    Eigen::MatrixXd TimeVector(
-        const size_t polynomial_order, 
-        const size_t derivative_order, 
-        const double dt) {
-      Eigen::MatrixXd base_coefficient_vec;
-      base_coefficient_vec.resize(polynomial_order + 1,1);
-      for(size_t idx = 0; idx < polynomial_order + 1; ++idx) {
-        // pow(0,0) is undefined. Define as 1.0.
-        if(0.0 == dt && 0 == idx) {
-          base_coefficient_vec(idx, 0) = 1.0 / factorial(idx);
-        } else {
-          base_coefficient_vec(idx, 0) = std::pow(dt, idx) / factorial(idx);
-        }
-      }
-    
-      Eigen::MatrixXd ones_vec;
-      ones_vec.resize(polynomial_order + 1 - derivative_order, 1);
-      ones_vec.fill(1);
-    
-      Eigen::MatrixXd shift_mat;
-      shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
-      shift_mat.fill(0);
-      shift_mat.diagonal(-1*derivative_order) = ones_vec;
-    
-      Eigen::MatrixXd coefficient_vec;
-      coefficient_vec.resize(polynomial_order + 1, 1);
-      coefficient_vec = shift_mat * base_coefficient_vec;
-    
-      return coefficient_vec;
-    }
 
     // Generates a square matrix that is the integrated form of d^n/dt^n [p(x)'p(x)].
     // The derivative of this matrix can be easily calculated by computing the
@@ -88,8 +48,8 @@ namespace p4 {
         for(size_t col = 0; col < polynomial_order + 1; ++col) {
           base_integrated_quadratic_matrix(row, col) = 
             std::pow(dt, row + col + 1) 
-            / factorial(row) 
-            / factorial(col) 
+            / Factorial(row) 
+            / Factorial(col) 
             / (row + col + 1);
         }
       }
@@ -121,7 +81,7 @@ namespace p4 {
     // Sets the upper and lower bound vectors for the equality and continuity
     // constraints.
     void SetConstraints(
-        const Info& info,
+        const Constants& constants,
         const std::vector<double>& times,
         const std::vector<NodeEqualityBound>& explicit_node_equality_bounds, 
         const std::vector<NodeInequalityBound>& explicit_node_inequality_bounds,
@@ -131,9 +91,9 @@ namespace p4 {
         std::vector<Eigen::Triplet<double>>& constraint_triplets
         ) {
       size_t constraint_idx = 0;
-      for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) { 
-        for(size_t node_idx = 0; node_idx < info.num_nodes; ++node_idx) {
-          for(size_t derivative_idx = 0; derivative_idx < info.num_params_per_segment_per_dim; ++derivative_idx) {
+      for(size_t dimension_idx = 0; dimension_idx < constants.num_dimensions; ++dimension_idx) { 
+        for(size_t node_idx = 0; node_idx < constants.num_nodes; ++node_idx) {
+          for(size_t derivative_idx = 0; derivative_idx < constants.num_params_per_segment_per_dim; ++derivative_idx) {
 
             // Equality Constraints
             for(const NodeEqualityBound& bound: explicit_node_equality_bounds) {
@@ -144,7 +104,7 @@ namespace p4 {
                 continue;
               }
               else {
-                const double alpha = node_idx+1 < info.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
+                const double alpha = node_idx+1 < constants.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
 
                 // Bounds. Scaled by alpha. See documentation.
                 lower_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, derivative_idx);
@@ -153,8 +113,8 @@ namespace p4 {
                 // Constraints
                 size_t parameter_idx = 0 
                   + derivative_idx 
-                  + info.num_params_per_node_per_dim * node_idx
-                  + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
+                  + constants.num_params_per_node_per_dim * node_idx
+                  + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx;
                 constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
 
                 constraint_idx++;
@@ -170,7 +130,7 @@ namespace p4 {
                 continue;
               }
               else {
-                const double alpha = node_idx+1 < info.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
+                const double alpha = node_idx+1 < constants.num_nodes ? (times[node_idx + 1] - times[node_idx]) : 1;
 
                 // Bounds. Scaled by alpha. See documentation.
                 lower_bound_vec(constraint_idx,0) = bound.lower * std::pow(alpha, derivative_idx);
@@ -179,8 +139,8 @@ namespace p4 {
                 // Constraints
                 size_t parameter_idx = 0 
                   + derivative_idx 
-                  + info.num_params_per_node_per_dim * node_idx
-                  + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx;
+                  + constants.num_params_per_node_per_dim * node_idx
+                  + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx;
                 constraint_triplets.emplace_back(constraint_idx, parameter_idx, 1);
 
                 constraint_idx++;
@@ -189,11 +149,11 @@ namespace p4 {
           }
 
           // Continuity constraints
-          if(node_idx < info.num_segments) {
-            const size_t num_continuity_constraints = info.continuity_order + 1;
+          if(node_idx < constants.num_segments) {
+            const size_t num_continuity_constraints = constants.continuity_order + 1;
             constexpr double delta_t = 1.0;
             const double alpha_k = times[node_idx + 1] - times[node_idx];
-            const double alpha_kp1 = node_idx + 2 < info.num_nodes ? times[node_idx + 2] - times[node_idx + 1] : 1.0;
+            const double alpha_kp1 = node_idx + 2 < constants.num_nodes ? times[node_idx + 2] - times[node_idx + 1] : 1.0;
 
 
             for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
@@ -204,30 +164,30 @@ namespace p4 {
               // Constraints. Scaled by alpha. See documentation.
               // Propagate the current node
               Eigen::MatrixXd segment_propagation_coefficients;
-              segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
+              segment_propagation_coefficients.resize(1, constants.num_params_per_segment_per_dim);
               segment_propagation_coefficients.fill(0);
               segment_propagation_coefficients 
-                = TimeVector(info.polynomial_order, continuity_idx, delta_t).transpose()
+                = TimeVector(constants.polynomial_order, continuity_idx, delta_t).transpose()
                 / std::pow(alpha_k, continuity_idx);
 
               // Minus the next node
               Eigen::MatrixXd segment_terminal_coefficients;
-              segment_terminal_coefficients.resize(1, info.num_params_per_segment_per_dim);
+              segment_terminal_coefficients.resize(1, constants.num_params_per_segment_per_dim);
               segment_terminal_coefficients.fill(0);
               segment_terminal_coefficients(0,continuity_idx) = -1 / std::pow(alpha_kp1, continuity_idx);
 
               size_t current_segment_idx = 0 
                 // Get to the right dimension
-                + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
+                + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx
                 // Get to the right node
-                + info.num_params_per_node_per_dim * node_idx;
+                + constants.num_params_per_node_per_dim * node_idx;
               size_t next_segment_idx = 0
                 // Get to the right dimension
-                + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
+                + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx
                 // Get to the right node
-                + info.num_params_per_node_per_dim * (node_idx + 1);
+                + constants.num_params_per_node_per_dim * (node_idx + 1);
 
-              for(size_t param_idx = 0; param_idx < info.num_params_per_segment_per_dim; ++param_idx) {
+              for(size_t param_idx = 0; param_idx < constants.num_params_per_segment_per_dim; ++param_idx) {
                 constraint_triplets.emplace_back(
                     constraint_idx, 
                     current_segment_idx + param_idx, 
@@ -256,7 +216,7 @@ namespace p4 {
       // from the number of points the the number of segments. Divide the
       // segment length (1) by the number of segments to get the length of each
       // intermediate segment.
-      const double dt = 1.0 / (info.num_intermediate_points + 2 - 1);
+      const double dt = 1.0 / (constants.num_intermediate_points + 2 - 1);
 
       // Segment lower bound constraints
       for(const SegmentInequalityBound& bound: explicit_segment_inequality_bounds) {
@@ -264,7 +224,7 @@ namespace p4 {
 
         // point_idx == intermediate_point_idx
         // Add 2 for start and end points
-        for(size_t point_idx = 0; point_idx < info.num_intermediate_points+2; ++point_idx)  {
+        for(size_t point_idx = 0; point_idx < constants.num_intermediate_points+2; ++point_idx)  {
           // Bounds
           lower_bound_vec(constraint_idx,0) = -SegmentInequalityBound::INFTY;
           upper_bound_vec(constraint_idx,0) = bound.value * std::pow(alpha, bound.derivative_idx);
@@ -273,25 +233,25 @@ namespace p4 {
           double time = point_idx * dt;
 
           Eigen::MatrixXd segment_propagation_coefficients;
-          segment_propagation_coefficients.resize(1, info.num_params_per_segment_per_dim);
+          segment_propagation_coefficients.resize(1, constants.num_params_per_segment_per_dim);
           segment_propagation_coefficients.fill(0);
           segment_propagation_coefficients 
-            = TimeVector(info.polynomial_order, bound.derivative_idx, time).transpose();
+            = TimeVector(constants.polynomial_order, bound.derivative_idx, time).transpose();
 
-          for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
+          for(size_t dimension_idx = 0; dimension_idx < constants.num_dimensions; ++dimension_idx) {
             Eigen::MatrixXd transform_coefficients;
-            transform_coefficients.resize(1, info.num_params_per_segment_per_dim);
+            transform_coefficients.resize(1, constants.num_params_per_segment_per_dim);
             transform_coefficients.fill(0);
             transform_coefficients = bound.mapping(dimension_idx, 0) 
               * segment_propagation_coefficients;
 
             size_t current_segment_idx = 0 
               // Get to the right dimension
-              + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
+              + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx
               // Get to the right node
-              + info.num_params_per_segment_per_dim * bound.segment_idx;
+              + constants.num_params_per_segment_per_dim * bound.segment_idx;
 
-            for(size_t param_idx = 0; param_idx < info.num_params_per_segment_per_dim; ++param_idx) {
+            for(size_t param_idx = 0; param_idx < constants.num_params_per_segment_per_dim; ++param_idx) {
               constraint_triplets.emplace_back(
                   constraint_idx, 
                   current_segment_idx + param_idx, 
@@ -305,21 +265,21 @@ namespace p4 {
     }
 
     void SetQuadraticCost(
-        const Info& info,
+        const Constants& constants,
         std::vector<Eigen::Triplet<double>>& quadratic_triplets) {
       const double delta_t = 1.0;
-      const Eigen::MatrixXd quadratic_matrix = QuadraticMatrix(info.polynomial_order, info.derivative_order, delta_t);
+      const Eigen::MatrixXd quadratic_matrix = QuadraticMatrix(constants.polynomial_order, constants.derivative_order, delta_t);
 
-      for(size_t dimension_idx = 0; dimension_idx < info.num_dimensions; ++dimension_idx) {
+      for(size_t dimension_idx = 0; dimension_idx < constants.num_dimensions; ++dimension_idx) {
         // No cost for final node
-        for(size_t node_idx = 0; node_idx < info.num_nodes - 1; ++node_idx) {
+        for(size_t node_idx = 0; node_idx < constants.num_nodes - 1; ++node_idx) {
           const size_t parameter_idx = 0
             // Get to the right dimension
-            + info.num_params_per_node_per_dim * info.num_nodes * dimension_idx
+            + constants.num_params_per_node_per_dim * constants.num_nodes * dimension_idx
             // Get to the right node
-            + info.num_params_per_node_per_dim * node_idx;
-          for(size_t row = 0; row < info.num_params_per_node_per_dim; ++row) {
-            for(size_t col = 0; col < info.num_params_per_node_per_dim; ++col) { 
+            + constants.num_params_per_node_per_dim * node_idx;
+          for(size_t row = 0; row < constants.num_params_per_node_per_dim; ++row) {
+            for(size_t col = 0; col < constants.num_params_per_node_per_dim; ++col) { 
               quadratic_triplets.emplace_back(
                   row + parameter_idx, 
                   col + parameter_idx, 
@@ -393,41 +353,41 @@ namespace p4 {
       std::exit(EXIT_FAILURE);
     }
 
-    Info info;
-    info.num_dimensions = this->options_.num_dimensions;
-    info.polynomial_order = this->options_.polynomial_order;
-    info.derivative_order = this->options_.derivative_order;
-    info.continuity_order = this->options_.continuity_order;
-    info.num_intermediate_points = this->options_.num_intermediate_points;
-    info.num_nodes = times.size();
-    info.num_segments = info.num_nodes - 1;
-    info.num_params_per_node_per_dim = info.polynomial_order + 1;
-    info.num_params_per_segment_per_dim = info.polynomial_order + 1;
-    info.num_params_per_node = info.num_dimensions * info.num_params_per_node_per_dim;
-    info.num_params_per_segment = info.num_dimensions * info.num_params_per_segment_per_dim;
-    info.total_num_params = info.num_params_per_node * info.num_nodes;
+    Constants constants;
+    constants.num_dimensions = this->options_.num_dimensions;
+    constants.polynomial_order = this->options_.polynomial_order;
+    constants.derivative_order = this->options_.derivative_order;
+    constants.continuity_order = this->options_.continuity_order;
+    constants.num_intermediate_points = this->options_.num_intermediate_points;
+    constants.num_nodes = times.size();
+    constants.num_segments = constants.num_nodes - 1;
+    constants.num_params_per_node_per_dim = constants.polynomial_order + 1;
+    constants.num_params_per_segment_per_dim = constants.polynomial_order + 1;
+    constants.num_params_per_node = constants.num_dimensions * constants.num_params_per_node_per_dim;
+    constants.num_params_per_segment = constants.num_dimensions * constants.num_params_per_segment_per_dim;
+    constants.total_num_params = constants.num_params_per_node * constants.num_nodes;
 
     // Explicit constraints are provided
     const size_t num_explicit_constraints = 0
       + explicit_node_equality_bounds.size() 
       + explicit_node_inequality_bounds.size() 
-      + explicit_segment_inequality_bounds.size() * (info.num_intermediate_points+2);
+      + explicit_segment_inequality_bounds.size() * (constants.num_intermediate_points+2);
 
     // Implicit constraints are continuity constraints
-    const size_t num_implicit_constraints = info.num_segments*(info.continuity_order+1)*info.num_dimensions;
+    const size_t num_implicit_constraints = constants.num_segments*(constants.continuity_order+1)*constants.num_dimensions;
 
-    info.num_constraints = num_explicit_constraints + num_implicit_constraints;
+    constants.num_constraints = num_explicit_constraints + num_implicit_constraints;
 
     /*
      * CONSTRAINTS
      */
     Eigen::MatrixXd lower_bound_vec, upper_bound_vec;
-    lower_bound_vec.resize(info.num_constraints, 1);
-    upper_bound_vec.resize(info.num_constraints, 1);
+    lower_bound_vec.resize(constants.num_constraints, 1);
+    upper_bound_vec.resize(constants.num_constraints, 1);
 
     std::vector<Eigen::Triplet<double>> constraint_triplets;
     SetConstraints(
-        info, 
+        constants, 
         times,
         explicit_node_equality_bounds,
         explicit_node_inequality_bounds,
@@ -438,8 +398,8 @@ namespace p4 {
 
     // Triplets to sparse mat
     Eigen::SparseMatrix<double> sparse_constraint_mat(
-        info.num_constraints, 
-        info.total_num_params);
+        constants.num_constraints, 
+        constants.total_num_params);
     sparse_constraint_mat.setFromTriplets(
         constraint_triplets.begin(), 
         constraint_triplets.end());
@@ -448,12 +408,12 @@ namespace p4 {
      * QUADRATIC MATRIX
      */
     std::vector<Eigen::Triplet<double>> quadratic_triplets;
-    SetQuadraticCost(info, quadratic_triplets);
+    SetQuadraticCost(constants, quadratic_triplets);
 
     // Triplets to sparse mat
     Eigen::SparseMatrix<double> sparse_quadratic_mat(
-        info.total_num_params, 
-        info.total_num_params);
+        constants.total_num_params, 
+        constants.total_num_params);
     sparse_quadratic_mat.setFromTriplets(
         quadratic_triplets.begin(), 
         quadratic_triplets.end());
@@ -467,13 +427,13 @@ namespace p4 {
     Eigen2OSQP(sparse_quadratic_mat, P);
     Eigen2OSQP(sparse_constraint_mat, A);
 
-    c_float q[info.total_num_params];
-    for(size_t param_idx = 0; param_idx < info.total_num_params; ++param_idx) {
+    c_float q[constants.total_num_params];
+    for(size_t param_idx = 0; param_idx < constants.total_num_params; ++param_idx) {
       q[param_idx] = 0;
     }
 
-    c_float l[info.num_constraints], u[info.num_constraints];
-    for(size_t row_idx = 0; row_idx < info.num_constraints; ++row_idx) {
+    c_float l[constants.num_constraints], u[constants.num_constraints];
+    for(size_t row_idx = 0; row_idx < constants.num_constraints; ++row_idx) {
       l[row_idx] = lower_bound_vec(row_idx, 0);
       u[row_idx] = upper_bound_vec(row_idx, 0);
     }
@@ -488,8 +448,8 @@ namespace p4 {
           c_free(data->A);
           c_free(data->P);
         });
-    data->n = info.total_num_params;
-    data->m = info.num_constraints;
+    data->n = constants.total_num_params;
+    data->m = constants.num_constraints;
     data->P = P;
     data->q = q;
     data->A = A;
@@ -499,9 +459,9 @@ namespace p4 {
     // Allocate and prepare workspace
     // Workspace shared pointer requires custom destructor
     PolynomialSolver::Solution solution;
-    solution.num_dimensions   = info.num_dimensions;
-    solution.polynomial_order = info.polynomial_order;
-    solution.num_nodes        = info.num_nodes;
+    solution.num_dimensions   = constants.num_dimensions;
+    solution.polynomial_order = constants.polynomial_order;
+    solution.num_nodes        = constants.num_nodes;
     solution.workspace =  std::shared_ptr<OSQPWorkspace>(
         osqp_setup(data.get(), &this->options_.osqp_settings),
         [](OSQPWorkspace* workspace) { 

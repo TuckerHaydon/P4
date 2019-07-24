@@ -1,53 +1,9 @@
 // Author: Tucker Haydon
 
 #include "polynomial_sampler.h"
+#include "common.h"
 
 namespace p4 {
-  namespace {
-    // Computes n!
-    size_t factorial(size_t n) {
-      return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
-    }
-
-    // Constructs and takes the derivative of a vector of the form:
-    //   [ (1/0! dt^0), (1/1! dt^1), (1/2! dt^2) ... ]'
-    // The derivative can be efficiently easily calculated by prepadding zeros
-    // to the front of the vector and shifting to the right. This follows from
-    // from the structure of the time vector.
-    //
-    // See the theory documentation for further details.
-    Eigen::MatrixXd TimeVector(
-        const size_t polynomial_order, 
-        const size_t derivative_order, 
-        const double time) {
-      Eigen::MatrixXd base_coefficient_vec;
-      base_coefficient_vec.resize(polynomial_order + 1,1);
-      for(size_t idx = 0; idx < polynomial_order + 1; ++idx) {
-        // std::pow(0,0) undefined. Define as 1.0.
-        if(0.0 == time && 0 == idx) {
-          base_coefficient_vec(idx, 0) = 1.0 / factorial(idx);
-        } else {
-          base_coefficient_vec(idx, 0) = std::pow(time, idx) / factorial(idx);
-        }
-      }
-    
-      Eigen::MatrixXd ones_vec;
-      ones_vec.resize(polynomial_order + 1 - derivative_order, 1);
-      ones_vec.fill(1);
-    
-      Eigen::MatrixXd shift_mat;
-      shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
-      shift_mat.fill(0);
-      shift_mat.diagonal(-1*derivative_order) = ones_vec;
-    
-      Eigen::MatrixXd coefficient_vec;
-      coefficient_vec.resize(polynomial_order + 1, 1);
-      coefficient_vec = shift_mat * base_coefficient_vec;
-    
-      return coefficient_vec;
-    }
-  }
-
   // Sample a polynomial path solution
   Eigen::MatrixXd PolynomialSampler::Run(
       const std::vector<double>& times,

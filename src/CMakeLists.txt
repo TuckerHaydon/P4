@@ -8,6 +8,7 @@ find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 set(SOURCE_FILES
   polynomial_solver.cc 
   polynomial_sampler.cc
+  common.cc
 )
 
 add_library(${TARGET} STATIC ${SOURCE_FILES})
