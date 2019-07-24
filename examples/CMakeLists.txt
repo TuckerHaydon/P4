@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 
 find_package(osqp REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Ceres REQUIRED)
 
 add_executable(speed speed.cc)
 target_link_libraries(speed 
@@ -44,3 +45,22 @@ IF(Boost_FOUND AND BUILD_3D_EXAMPLE)
 ELSE()
   MESSAGE("3D example disabled.")
 ENDIF()
+
+
+add_executable(tst tst.cc)
+target_link_libraries(tst
+  lib_p4
+  Eigen3::Eigen
+  osqp::osqpstatic
+  ${CERES_LIBRARIES}
+)
+
+set_target_properties(tst PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED YES
+  CXX_EXTENSIONS NO
+)
+
+target_compile_options(tst PRIVATE 
+  -Wfatal-errors
+)

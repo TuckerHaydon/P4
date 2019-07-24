@@ -72,9 +72,11 @@ namespace p4 {
         //   a) https://osqp.org/docs/interfaces/cc++#workspace
         std::shared_ptr<OSQPWorkspace> workspace = nullptr;
 
-        // Required
+        // Number of dimensions
         size_t num_dimensions   = 0;
+        // Order of piecewise polynomial
         size_t polynomial_order = 0;
+        // Number of nodes (corresponds with the number of times)
         size_t num_nodes        = 0;
 
         Solution() {};
