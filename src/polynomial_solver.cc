@@ -5,7 +5,6 @@
 #include <vector>
 
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
 #include <osqp.h>
 
 #include "polynomial_solver.h"
@@ -291,52 +290,6 @@ namespace p4 {
       }
     }
 
-    // Converts an en eigen sparse matrix into an OSQP sparse matrix
-    // Reference: https://github.com/robotology/osqp-eigen
-    void Eigen2OSQP(
-        const Eigen::SparseMatrix<double> eigen_sparse_mat,
-        csc*& osqp_mat) {
-
-      // get number of row, columns and nonZeros from Eigen SparseMatrix
-      c_int rows   = eigen_sparse_mat.rows();
-      c_int cols   = eigen_sparse_mat.cols();
-      c_int num_nz = eigen_sparse_mat.nonZeros();
-    
-      // get inner and outer index
-      const int* innerIndexPtr    = eigen_sparse_mat.innerIndexPtr();
-      const int* outerIndexPtr    = eigen_sparse_mat.outerIndexPtr();
-      const int* innerNonZerosPtr = eigen_sparse_mat.innerNonZeroPtr();
-    
-      // get nonzero values
-      const double* valuePtr = eigen_sparse_mat.valuePtr();
-    
-      // Allocate memory for csc matrix
-      if(osqp_mat != nullptr){
-        std::cerr << "osqp_mat pointer is not a null pointer! " << std::endl;
-        std::exit(EXIT_FAILURE);
-      }
-    
-      osqp_mat = csc_spalloc(rows, cols, num_nz, 1, 0);
-    
-      int innerOsqpPosition = 0;
-      for(int k = 0; k < cols; ++k) {
-          if (eigen_sparse_mat.isCompressed()) {
-              osqp_mat->p[k] = static_cast<c_int>(outerIndexPtr[k]);
-          } else {
-              if (k == 0) {
-                  osqp_mat->p[k] = 0;
-              } else {
-                  osqp_mat->p[k] = osqp_mat->p[k-1] + innerNonZerosPtr[k-1];
-              }
-          }
-          for (typename Eigen::SparseMatrix<double>::InnerIterator it(eigen_sparse_mat,k); it; ++it) {
-              osqp_mat->i[innerOsqpPosition] = static_cast<c_int>(it.row());
-              osqp_mat->x[innerOsqpPosition] = static_cast<c_float>(it.value());
-              innerOsqpPosition++;
-          }
-      }
-      osqp_mat->p[static_cast<int>(cols)] = static_cast<c_int>(innerOsqpPosition);
-    }
   }
 
 
