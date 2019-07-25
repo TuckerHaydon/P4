@@ -28,7 +28,7 @@ namespace p4 {
           new ceres::DynamicAutoDiffCostFunction<PolynomialCostFunction>(
             new PolynomialCostFunction(solver_solution));
         // The number of nodes is equal to the number of times to optimize
-        cost_function->AddParameterBlock(solver_solution.num_nodes);
+        cost_function->AddParameterBlock(solver_solution.constants.num_nodes);
         // There is only one residual: the evaluated cost function
         cost_function->SetNumResiduals(1);
 
@@ -45,7 +45,7 @@ namespace p4 {
 
         // Get the size of times
         // const int32_t size_y = parameter_block_sizes()[0];
-        const int32_t size_y = this->solver_solution_.num_nodes;
+        const int32_t size_y = this->solver_solution_.constants.num_nodes;
 
         // Cast constant coefficients to type Jet
         const auto x = 
@@ -154,7 +154,7 @@ namespace p4 {
 
     if(true == success) {
       std::cout << "Residual: " << residuals.Get()[0] << std::endl;
-      for(size_t jacobian_idx = 0; jacobian_idx < solver_solution.num_nodes; ++jacobian_idx) {
+      for(size_t jacobian_idx = 0; jacobian_idx < solver_solution.constants.num_nodes; ++jacobian_idx) {
         std::cout << "Jacobian: " << jacobian.Get()[0][jacobian_idx] << std::endl;
       }
     } else {

@@ -14,14 +14,14 @@ namespace p4 {
   struct NodeEqualityBound {
     // The dimension being constrained. If a path has four dimensions
     // (x,y,z,yaw), then 0 = x, 1 = y, etc.
-    const size_t dimension_idx;
+    size_t dimension_idx;
     // The index of the node being constrained.
-    const size_t node_idx;
+    size_t node_idx;
     // The index of the derivative being constraints. 0 = position, 1 =
     // velocity, etc.
-    const size_t derivative_idx;
+    size_t derivative_idx;
     // The value that the constraint takes.
-    const double value;
+    double value;
   
     NodeEqualityBound(
       const size_t dimension_idx_,
@@ -44,14 +44,14 @@ namespace p4 {
 
     // The dimension being constrained. If a path has four dimensions
     // (x,y,z,yaw), then 0 = x, 1 = y, etc.
-    const size_t dimension_idx;
+    size_t dimension_idx;
     // The index of the node being constrained.
-    const size_t node_idx;
+    size_t node_idx;
     // The index of the derivative being constraints. 0 = position, 1 =
     // velocity, etc.
-    const size_t derivative_idx;
+    size_t derivative_idx;
     // The value that the constraint takes.
-    const double lower, upper;
+    double lower, upper;
   
     NodeInequalityBound(
       const size_t dimension_idx_,
@@ -76,14 +76,14 @@ namespace p4 {
     static constexpr c_float INFTY = OSQP_INFTY;
 
     // The index of the node being constrained.
-    const size_t segment_idx;
+    size_t segment_idx;
     // The index of the derivative being constraints. 0 = position, 1 =
     // velocity, etc.
-    const size_t derivative_idx;
+    size_t derivative_idx;
     // A mapping that from N-to-scalar
     Eigen::MatrixXd mapping;
     // The value that the constraint takes.
-    const double value;
+    double value;
   
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     SegmentInequalityBound(

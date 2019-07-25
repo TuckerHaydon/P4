@@ -64,13 +64,12 @@ int main(int argc, char** argv) {
 
   // Solve
   PolynomialSolver solver(solver_options);
-  const PolynomialSolver::Solution solution
-    = solver.Run(
+  solver.Setup(
         times, 
         node_equality_bounds,
         node_inequality_bounds,
         segment_inequality_bounds);
-
+  const PolynomialSolver::Solution solution = solver.Run();
   // Print some output info
   // Reference: https://osqp.org/docs/interfaces/cc++#info
   std::cout << "Status:                    " << solution.workspace->info->status << std::endl;

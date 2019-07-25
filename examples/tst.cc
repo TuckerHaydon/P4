@@ -36,13 +36,14 @@ int main(int argc, char** argv) {
   solver_options.polynomial_order = 7;
   solver_options.derivative_order = 3;
   solver_options.continuity_order = 3;
-  PolynomialSolver solver(solver_options);
 
-  PolynomialSolver::Solution solver_solution =  solver.Run(
+  PolynomialSolver solver(solver_options);
+  solver.Setup(
           initial_times,
           node_equality_bounds,
           node_inequality_bounds,
           segment_inequality_bounds);
+  PolynomialSolver::Solution solver_solution = solver.Run();
 
   PolynomialGradient gradient;
   gradient.Test(

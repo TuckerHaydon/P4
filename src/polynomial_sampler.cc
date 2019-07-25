@@ -14,9 +14,9 @@ namespace p4 {
       solution.Coefficients();
 
     // Helper constants
-    const size_t num_dimensions = solution.num_dimensions;
-    const size_t num_nodes = solution.num_nodes;
-    const size_t polynomial_order = solution.polynomial_order;
+    const size_t num_dimensions = solution.constants.num_dimensions;
+    const size_t num_nodes = solution.constants.num_nodes;
+    const size_t polynomial_order = solution.constants.polynomial_order;
     const size_t num_samples 
       = static_cast<size_t>((times.back() - times.front()) * this->options_.frequency);
 
