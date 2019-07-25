@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
   PolynomialGradient gradient;
   gradient.Test(
       initial_times,
+      solver,
       solver_solution);
   return EXIT_SUCCESS;
 }

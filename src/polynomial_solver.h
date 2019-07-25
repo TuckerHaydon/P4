@@ -168,7 +168,7 @@ namespace p4 {
       Solution Run();
 
     template <class T>
-    void SetQuadraticCost(std::vector<Eigen::Triplet<T>>& quadratic_triplets);
+    void SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_quadratic_mat);
 
     // Generates a square matrix that is the integrated form of d^n/dt^n [p(x)'p(x)].
     // The derivative of this matrix can be easily calculated by computing the
@@ -187,9 +187,10 @@ namespace p4 {
     // constraints.
     template <class T>
     void SetConstraints(
+        const std::vector<T>& times,
         Eigen::Matrix<T, Eigen::Dynamic, 1>& lower_bound_vec, 
         Eigen::Matrix<T, Eigen::Dynamic, 1>& upper_bound_vec,
-        std::vector<Eigen::Triplet<T>>& constraint_triplets);
+        Eigen::SparseMatrix<T>& sparse_constraint_mat);
   
     private:
       Options options_;

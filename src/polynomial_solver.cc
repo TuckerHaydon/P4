@@ -56,9 +56,11 @@ namespace p4 {
 
   template <class T>
   void PolynomialSolver::SetConstraints(
+      const std::vector<T>& times,
       Eigen::Matrix<T, Eigen::Dynamic, 1>& lower_bound_vec, 
       Eigen::Matrix<T, Eigen::Dynamic, 1>& upper_bound_vec,
-      std::vector<Eigen::Triplet<T>>& constraint_triplets) {
+      Eigen::SparseMatrix<T>& sparse_constraint_mat) {
+    std::vector<Eigen::Triplet<T>> constraint_triplets;
     size_t constraint_idx = 0;
     for(size_t dimension_idx = 0; dimension_idx < this->workspace_.constants.num_dimensions; ++dimension_idx) { 
       for(size_t node_idx = 0; node_idx < this->workspace_.constants.num_nodes; ++node_idx) {
@@ -74,7 +76,7 @@ namespace p4 {
             }
             else {
               const T alpha = node_idx+1 < this->workspace_.constants.num_nodes 
-                ? T(this->workspace_.times[node_idx + 1] - this->workspace_.times[node_idx]) : T(1);
+                ? times[node_idx + 1] - times[node_idx] : T(1);
 
               // Bounds. Scaled by alpha. See documentation.
               lower_bound_vec(constraint_idx) = T(bound.value) * std::pow(alpha, T(derivative_idx));
@@ -101,7 +103,7 @@ namespace p4 {
             }
             else {
               const T alpha = node_idx+1 < this->workspace_.constants.num_nodes 
-                ? T(this->workspace_.times[node_idx + 1] - this->workspace_.times[node_idx]) : T(1);
+                ? times[node_idx + 1] - times[node_idx] : T(1);
 
               // Bounds. Scaled by alpha. See documentation.
               lower_bound_vec(constraint_idx) = T(bound.lower) * std::pow(alpha, T(derivative_idx));
@@ -123,9 +125,9 @@ namespace p4 {
         if(node_idx < this->workspace_.constants.num_segments) {
           const size_t num_continuity_constraints = this->workspace_.constants.continuity_order + 1;
           const double delta_t = 1.0;
-          const T alpha_k = T(this->workspace_.times[node_idx + 1] - this->workspace_.times[node_idx]);
+          const T alpha_k = times[node_idx + 1] - times[node_idx];
           const T alpha_kp1 = node_idx + 2 < this->workspace_.constants.num_nodes 
-            ? T(this->workspace_.times[node_idx + 2] - this->workspace_.times[node_idx + 1]) : T(1.0);
+            ? times[node_idx + 2] - times[node_idx + 1] : T(1.0);
 
 
           for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
@@ -198,7 +200,7 @@ namespace p4 {
 
     // Segment lower bound constraints
     for(const SegmentInequalityBound& bound: this->workspace_.explicit_segment_inequality_bounds) {
-      const T alpha = T(this->workspace_.times[bound.segment_idx+1] - this->workspace_.times[bound.segment_idx]);
+      const T alpha = times[bound.segment_idx+1] - times[bound.segment_idx];
 
       // point_idx == intermediate_point_idx
       // Add 2 for start and end points
@@ -243,11 +245,15 @@ namespace p4 {
         constraint_idx++;
       }
     }
+
+    sparse_constraint_mat.setFromTriplets(
+        constraint_triplets.begin(), 
+        constraint_triplets.end());
   }
 
   template <class T>
-  void PolynomialSolver::SetQuadraticCost(
-      std::vector<Eigen::Triplet<T>>& quadratic_triplets) {
+  void PolynomialSolver::SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_mat) {
+    std::vector<Eigen::Triplet<T>> quadratic_triplets;
     const T delta_t = T(1.0);
     const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> quadratic_matrix = 
       this->QuadraticMatrix<T>(
@@ -277,6 +283,10 @@ namespace p4 {
         }
       }
     }
+
+    sparse_mat.setFromTriplets(
+        quadratic_triplets.begin(), 
+        quadratic_triplets.end());
   }
 
   bool PolynomialSolver::Setup(
@@ -351,15 +361,11 @@ namespace p4 {
         this->workspace_.constants.total_num_params);
 
     // Fill constraints
-    std::vector<Eigen::Triplet<double>> constraint_triplets;
     this->SetConstraints<double>(
+        this->workspace_.times,
         this->workspace_.lower_bound_vec, 
         this->workspace_.upper_bound_vec, 
-        constraint_triplets);
-
-    this->workspace_.sparse_constraint_mat.setFromTriplets(
-        constraint_triplets.begin(), 
-        constraint_triplets.end());
+        this->workspace_.sparse_constraint_mat);
 
     // Allocate quadratic matrix
     this->workspace_.sparse_quadratic_mat = Eigen::SparseMatrix<double>(
@@ -367,11 +373,7 @@ namespace p4 {
         this->workspace_.constants.total_num_params);
 
     // Fill quadratic matrix
-    std::vector<Eigen::Triplet<double>> quadratic_triplets;
-    this->SetQuadraticCost<double>(quadratic_triplets);
-    this->workspace_.sparse_quadratic_mat.setFromTriplets(
-        quadratic_triplets.begin(), 
-        quadratic_triplets.end());
+    this->SetQuadraticCost<double>(this->workspace_.sparse_quadratic_mat);
 
     // Workspace is now set up
     this->workspace_.setup = true;
