@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 
 #include "polynomial_bounds.h"
+#include "common.h"
 
 namespace p4 {
   /* Class for solving piecewise polynomial fitting & minimization problems.
@@ -168,7 +169,7 @@ namespace p4 {
       Solution Run();
 
     template <class T>
-    void SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_quadratic_mat);
+    void SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_quadratic_mat) const;
 
     // Generates a square matrix that is the integrated form of d^n/dt^n [p(x)'p(x)].
     // The derivative of this matrix can be easily calculated by computing the
@@ -181,7 +182,7 @@ namespace p4 {
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> QuadraticMatrix(
         const size_t polynomial_order,
         const size_t derivative_order,
-        const T dt);
+        const T dt) const;
 
     // Sets the upper and lower bound vectors for the equality and continuity
     // constraints.
@@ -190,10 +191,304 @@ namespace p4 {
         const std::vector<T>& times,
         Eigen::Matrix<T, Eigen::Dynamic, 1>& lower_bound_vec, 
         Eigen::Matrix<T, Eigen::Dynamic, 1>& upper_bound_vec,
-        Eigen::SparseMatrix<T>& sparse_constraint_mat);
+        Eigen::SparseMatrix<T>& sparse_constraint_mat) const;
   
     private:
       Options options_;
       Workspace workspace_;
   }; 
+
+  /*******************************
+   * Inline Template Definitions *
+   *******************************/
+  template <class T>
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> PolynomialSolver::QuadraticMatrix(
+      const size_t polynomial_order,
+      const size_t derivative_order,
+      const T dt) const {
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> base_integrated_quadratic_matrix;
+    base_integrated_quadratic_matrix.resize(polynomial_order + 1, polynomial_order + 1);
+    base_integrated_quadratic_matrix.fill(T(0));
+    // The number of coefficients is equal to the polynomial_order + 1
+    for(size_t row = 0; row < polynomial_order + 1; ++row) {
+      for(size_t col = 0; col < polynomial_order + 1; ++col) {
+        base_integrated_quadratic_matrix(row, col) = 
+          pow(dt, row + col + 1) 
+          / T(Factorial(row))
+          / T(Factorial(col))
+          / T((row + col + 1));
+      }
+    }
+  
+    // Vector of ones
+    Eigen::Matrix<T, Eigen::Dynamic, 1> ones_vec;
+    ones_vec.resize(polynomial_order + 1 - derivative_order);
+    ones_vec.fill(T(1));
+  
+    // Shift the matrix down rows
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> row_shift_mat;
+    row_shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
+    row_shift_mat.fill(T(0));
+    row_shift_mat.diagonal(-1*derivative_order) = ones_vec;
+  
+    // Shift the matrix right cols
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> col_shift_mat;
+    col_shift_mat.resize(polynomial_order + 1, polynomial_order + 1);
+    col_shift_mat.fill(T(0));
+    col_shift_mat.diagonal(+1*derivative_order) = ones_vec;
+  
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> integrated_quadratic_matrix;
+    integrated_quadratic_matrix.resize(polynomial_order + 1, polynomial_order + 1);
+    integrated_quadratic_matrix = row_shift_mat * base_integrated_quadratic_matrix * col_shift_mat;
+  
+    return integrated_quadratic_matrix;
+  }
+
+  template <class T>
+  void PolynomialSolver::SetConstraints(
+      const std::vector<T>& times,
+      Eigen::Matrix<T, Eigen::Dynamic, 1>& lower_bound_vec, 
+      Eigen::Matrix<T, Eigen::Dynamic, 1>& upper_bound_vec,
+      Eigen::SparseMatrix<T>& sparse_constraint_mat) const {
+
+    // Resize and allocate space for output
+    std::vector<Eigen::Triplet<T>> constraint_triplets;
+    lower_bound_vec.resize(this->workspace_.constants.num_constraints);
+    upper_bound_vec.resize(this->workspace_.constants.num_constraints);
+    sparse_constraint_mat = Eigen::SparseMatrix<T>(
+        this->workspace_.constants.num_constraints,
+        this->workspace_.constants.total_num_params);
+
+    size_t constraint_idx = 0;
+    for(size_t dimension_idx = 0; dimension_idx < this->workspace_.constants.num_dimensions; ++dimension_idx) { 
+      for(size_t node_idx = 0; node_idx < this->workspace_.constants.num_nodes; ++node_idx) {
+        for(size_t derivative_idx = 0; derivative_idx < this->workspace_.constants.num_params_per_segment_per_dim; ++derivative_idx) {
+
+          // Equality Constraints
+          for(const NodeEqualityBound& bound: this->workspace_.explicit_node_equality_bounds) {
+            if(
+                false == (bound.node_idx == node_idx) ||
+                false == (bound.dimension_idx == dimension_idx) || 
+                false == (bound.derivative_idx == derivative_idx)) {
+              continue;
+            }
+            else {
+              const T alpha = node_idx+1 < this->workspace_.constants.num_nodes 
+                ? times[node_idx + 1] - times[node_idx] : T(1);
+
+              // Bounds. Scaled by alpha. See documentation.
+              lower_bound_vec(constraint_idx) = T(bound.value) * pow(alpha, T(derivative_idx));
+              upper_bound_vec(constraint_idx) = T(bound.value) * pow(alpha, T(derivative_idx));
+
+              // Constraints
+              size_t parameter_idx = 0 
+                + derivative_idx 
+                + this->workspace_.constants.num_params_per_node_per_dim * node_idx
+                + this->workspace_.constants.num_params_per_node_per_dim * this->workspace_.constants.num_nodes * dimension_idx;
+              constraint_triplets.emplace_back(constraint_idx, parameter_idx, T(1));
+
+              constraint_idx++;
+            }
+          }
+
+          // Node inequality bound constraints
+          for(const NodeInequalityBound& bound: this->workspace_.explicit_node_inequality_bounds) {
+            if(
+                false == (bound.node_idx == node_idx) ||
+                false == (bound.dimension_idx == dimension_idx) || 
+                false == (bound.derivative_idx == derivative_idx)) {
+              continue;
+            }
+            else {
+              const T alpha = node_idx+1 < this->workspace_.constants.num_nodes 
+                ? times[node_idx + 1] - times[node_idx] : T(1);
+
+              // Bounds. Scaled by alpha. See documentation.
+              lower_bound_vec(constraint_idx) = T(bound.lower) * pow(alpha, T(derivative_idx));
+              upper_bound_vec(constraint_idx) = T(bound.upper) * pow(alpha, T(derivative_idx));
+
+              // Constraints
+              size_t parameter_idx = 0 
+                + derivative_idx 
+                + this->workspace_.constants.num_params_per_node_per_dim * node_idx
+                + this->workspace_.constants.num_params_per_node_per_dim * this->workspace_.constants.num_nodes * dimension_idx;
+              constraint_triplets.emplace_back(constraint_idx, parameter_idx, T(1));
+
+              constraint_idx++;
+            }
+          }
+        }
+
+        // Continuity constraints
+        if(node_idx < this->workspace_.constants.num_segments) {
+          const size_t num_continuity_constraints = this->workspace_.constants.continuity_order + 1;
+          const double delta_t = 1.0;
+          const T alpha_k = times[node_idx + 1] - times[node_idx];
+          const T alpha_kp1 = node_idx + 2 < this->workspace_.constants.num_nodes 
+            ? times[node_idx + 2] - times[node_idx + 1] : T(1.0);
+
+
+          for(size_t continuity_idx = 0; continuity_idx < num_continuity_constraints; ++continuity_idx) {
+            // Bounds
+            lower_bound_vec(constraint_idx) = T(0);
+            upper_bound_vec(constraint_idx) = T(0);
+
+            // Constraints. Scaled by alpha. See documentation.
+            // Propagate the current node
+            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> segment_propagation_coefficients;
+            segment_propagation_coefficients.resize(1, this->workspace_.constants.num_params_per_segment_per_dim);
+            segment_propagation_coefficients.fill(T(0));
+            segment_propagation_coefficients 
+              = TimeVector(this->workspace_.constants.polynomial_order, continuity_idx, delta_t).transpose().cast<T>()
+              / pow(alpha_k, T(continuity_idx));
+
+            // Minus the next node
+            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> segment_terminal_coefficients;
+            segment_terminal_coefficients.resize(1, this->workspace_.constants.num_params_per_segment_per_dim);
+            segment_terminal_coefficients.fill(T(0));
+            segment_terminal_coefficients(0,continuity_idx) = T(-1) / pow(alpha_kp1, T(continuity_idx));
+
+            size_t current_segment_idx = 0 
+              // Get to the right dimension
+              + this->workspace_.constants.num_params_per_node_per_dim 
+              * this->workspace_.constants.num_nodes 
+              * dimension_idx
+              // Get to the right node
+              + this->workspace_.constants.num_params_per_node_per_dim 
+              * node_idx;
+            size_t next_segment_idx = 0
+              // Get to the right dimension
+              + this->workspace_.constants.num_params_per_node_per_dim 
+              * this->workspace_.constants.num_nodes 
+              * dimension_idx
+              // Get to the right node
+              + this->workspace_.constants.num_params_per_node_per_dim 
+              * (node_idx + 1);
+
+            for(size_t param_idx = 0; param_idx < this->workspace_.constants.num_params_per_segment_per_dim; ++param_idx) {
+              constraint_triplets.emplace_back(
+                  constraint_idx, 
+                  current_segment_idx + param_idx, 
+                  segment_propagation_coefficients(0, param_idx));
+              // TODO: Just insert one terminal constraint
+              constraint_triplets.emplace_back(
+                  constraint_idx, 
+                  next_segment_idx + param_idx, 
+                  segment_terminal_coefficients(0, param_idx));
+            }
+
+            constraint_idx++;
+          }
+        }
+      }
+    }
+
+    // Include start- and end-points in segment constraints. When constraining
+    // a segment, also constrain the endpoints of the segment to the same
+    // value. If this were not the case, the following situation could occur:
+    // the start endpoint is constrained to -2, but the following segment is
+    // constrained above zero. Clearly, there is no smooth solution that
+    // permits this. 
+    // 
+    // Add two to account for the endpoints and then remove one to convert
+    // from the number of points the the number of segments. Divide the
+    // segment length (1) by the number of segments to get the length of each
+    // intermediate segment.
+    const double dt = 1.0 / (this->workspace_.constants.num_intermediate_points + 2 - 1);
+
+    // Segment lower bound constraints
+    for(const SegmentInequalityBound& bound: this->workspace_.explicit_segment_inequality_bounds) {
+      const T alpha = times[bound.segment_idx+1] - times[bound.segment_idx];
+
+      // point_idx == intermediate_point_idx
+      // Add 2 for start and end points
+      for(size_t point_idx = 0; point_idx < this->workspace_.constants.num_intermediate_points+2; ++point_idx)  {
+        // Bounds
+        lower_bound_vec(constraint_idx) = T(-SegmentInequalityBound::INFTY);
+        upper_bound_vec(constraint_idx) = T(bound.value) * pow(alpha, T(bound.derivative_idx));
+
+        // Time at a specific point
+        double time = point_idx * dt;
+
+        Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> segment_propagation_coefficients;
+        segment_propagation_coefficients.resize(1, this->workspace_.constants.num_params_per_segment_per_dim);
+        segment_propagation_coefficients.fill(T(0));
+        segment_propagation_coefficients 
+          = TimeVector(this->workspace_.constants.polynomial_order, bound.derivative_idx, time).transpose().cast<T>();
+
+        for(size_t dimension_idx = 0; dimension_idx < this->workspace_.constants.num_dimensions; ++dimension_idx) {
+          Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> transform_coefficients;
+          transform_coefficients.resize(1, this->workspace_.constants.num_params_per_segment_per_dim);
+          transform_coefficients.fill(T(0));
+          transform_coefficients = T(bound.mapping(dimension_idx, 0))
+            * segment_propagation_coefficients;
+
+          size_t current_segment_idx = 0 
+            // Get to the right dimension
+            + this->workspace_.constants.num_params_per_node_per_dim 
+            * this->workspace_.constants.num_nodes 
+            * dimension_idx
+            // Get to the right node
+            + this->workspace_.constants.num_params_per_segment_per_dim 
+            * bound.segment_idx;
+
+          for(size_t param_idx = 0; param_idx < this->workspace_.constants.num_params_per_segment_per_dim; ++param_idx) {
+            constraint_triplets.emplace_back(
+                constraint_idx, 
+                current_segment_idx + param_idx, 
+                transform_coefficients(0, param_idx));
+          }
+        }
+
+        constraint_idx++;
+      }
+    }
+
+    sparse_constraint_mat.setFromTriplets(
+        constraint_triplets.begin(), 
+        constraint_triplets.end());
+  }
+
+  template <class T>
+  void PolynomialSolver::SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_mat) const {
+    // Allocate space for sparse matrix
+    sparse_mat = Eigen::SparseMatrix<T>(
+        this->workspace_.constants.total_num_params,
+        this->workspace_.constants.total_num_params);
+
+    std::vector<Eigen::Triplet<T>> quadratic_triplets;
+    const T delta_t = T(1.0);
+    const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> quadratic_matrix = 
+      this->QuadraticMatrix<T>(
+          T(this->workspace_.constants.polynomial_order), 
+          T(this->workspace_.constants.derivative_order),
+          delta_t);
+
+    for(size_t dimension_idx = 0; dimension_idx < this->workspace_.constants.num_dimensions; ++dimension_idx) {
+      // No cost for final node
+      for(size_t node_idx = 0; node_idx < this->workspace_.constants.num_nodes - 1; ++node_idx) {
+        const size_t parameter_idx = 0
+          // Get to the right dimension
+          + this->workspace_.constants.num_params_per_node_per_dim 
+          * this->workspace_.constants.num_nodes 
+          * dimension_idx
+          // Get to the right node
+          + this->workspace_.constants.num_params_per_node_per_dim 
+          * node_idx;
+        for(size_t row = 0; row < this->workspace_.constants.num_params_per_node_per_dim; ++row) {
+          for(size_t col = 0; col < this->workspace_.constants.num_params_per_node_per_dim; ++col) { 
+            quadratic_triplets.emplace_back(
+                T(row + parameter_idx), 
+                T(col + parameter_idx), 
+                quadratic_matrix(row,col)
+                );
+          }
+        }
+      }
+    }
+
+    sparse_mat.setFromTriplets(
+        quadratic_triplets.begin(), 
+        quadratic_triplets.end());
+  }
 }

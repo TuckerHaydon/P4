@@ -35,15 +35,18 @@ int main(int argc, char** argv) {
   solver_options.num_dimensions   = 1;
   solver_options.polynomial_order = 7;
   solver_options.derivative_order = 3;
-  solver_options.continuity_order = 3;
+  solver_options.continuity_order = 2;
+  solver_options.osqp_settings.scaling    = 0;
+  solver_options.osqp_settings.polish     = 1;
+  solver_options.osqp_settings.warm_start = 0;
 
-  PolynomialSolver solver(solver_options);
-  solver.Setup(
+  auto solver = std::make_shared<PolynomialSolver>(solver_options);
+  solver->Setup(
           initial_times,
           node_equality_bounds,
           node_inequality_bounds,
           segment_inequality_bounds);
-  PolynomialSolver::Solution solver_solution = solver.Run();
+  PolynomialSolver::Solution solver_solution = solver->Run();
 
   PolynomialGradient gradient;
   gradient.Test(

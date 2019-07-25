@@ -94,7 +94,7 @@ namespace p4 {
 
       void Test(
           const std::vector<double>& initial_times,
-          const PolynomialSolver& solver,
+          const std::shared_ptr<const PolynomialSolver>& solver,
           const PolynomialSolver::Solution& solver_solution);
 
     private:
