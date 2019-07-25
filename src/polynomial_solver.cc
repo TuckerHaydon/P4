@@ -415,6 +415,7 @@ namespace p4 {
     solution.num_dimensions   = constants.num_dimensions;
     solution.polynomial_order = constants.polynomial_order;
     solution.num_nodes        = constants.num_nodes;
+    solution.data = data;
     solution.workspace =  std::shared_ptr<OSQPWorkspace>(
         osqp_setup(data.get(), &this->options_.osqp_settings),
         [](OSQPWorkspace* workspace) { 

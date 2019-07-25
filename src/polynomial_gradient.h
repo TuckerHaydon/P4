@@ -7,17 +7,17 @@
 namespace p4 {
   // Class encapsulating the algorithm used to determine the gradient of the
   // following bi-level optimization problem:
-  // argmin(x,y) x' P(y) x + q(y)' x + c(y)
+  // argmin(x,y) 0.5 * x' P(y) x + q(y)' x + c(y)
   //   s.t. 
   //     Ay <= b
   //     Cy == d
-  //     x = argmin(x) x' P x + q(y)' x + c(y)
+  //     x = argmin(x) 0.5 * x' P x + q(y)' x + c(y)
   //       s.t.
   //         G(y) x <= h(y)
   //         L(y) x == m(y)
   //
   // The goal is to determine the partial derivative with respect to y of:
-  //   f(x,y) = x' P(y) x + q(y)' x + c(y) 
+  //   f(x,y) = 0.5 * x' P(y) x + q(y)' x + c(y) 
   //
   // With y (waypoint arrival time) held fixed, x (polynomial coefficients) can
   // easily be found with a quadratic programming solution. Thus, the ultimate
@@ -89,9 +89,12 @@ namespace p4 {
       // Leverage google::ceres and its automatic differentiation engine to
       // determing the numeric derivatives.
       Solution Run(
+          const std::vector<double>& initial_times,
           const PolynomialSolver::Solution& solver_solution);
 
-      void Test(const PolynomialSolver::Solution& solver_solution);
+      void Test(
+          const std::vector<double>& initial_times,
+          const PolynomialSolver::Solution& solver_solution);
 
     private:
       Options options_;

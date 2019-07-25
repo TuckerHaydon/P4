@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
     NodeEqualityBound(0,0,1,0),
     NodeEqualityBound(0,0,2,0),
 
-    // Constraining position and velocity of first node to zero
-    NodeEqualityBound(0,1,0,0),
+    // Constraining position, velocity, and acceleration of second node
+    NodeEqualityBound(0,1,0,1),
     NodeEqualityBound(0,1,1,0),
     NodeEqualityBound(0,1,2,0),
   };
@@ -45,6 +45,8 @@ int main(int argc, char** argv) {
           segment_inequality_bounds);
 
   PolynomialGradient gradient;
-  gradient.Test(solver_solution);
+  gradient.Test(
+      initial_times,
+      solver_solution);
   return EXIT_SUCCESS;
 }

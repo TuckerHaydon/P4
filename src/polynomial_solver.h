@@ -64,6 +64,9 @@ namespace p4 {
       struct Solution {
         // Heap-allocated shared pointer to an OSQPWorkspace instance. Must
         // define a custom destructor for cleanup.
+        // Important notes:
+        //   a) Do not use workspace->data. It returns bad data. I don't know
+        //   why. Instead, use an OSQPData instance included below.
         // Important includes:
         //   a) workspace.info.obj_val: the optimal cost of the optimization
         //   problem: J = 0.5 * x' * P * x
@@ -71,6 +74,12 @@ namespace p4 {
         // Resources: 
         //   a) https://osqp.org/docs/interfaces/cc++#workspace
         std::shared_ptr<OSQPWorkspace> workspace = nullptr;
+
+        // Heap-allocated shared pointer to an OSQPData instance. Must define a
+        // custom destructor for cleanup.
+        // Resources:
+        //   a) https://osqp.org/docs/interfaces/cc++#data
+        std::shared_ptr<OSQPData> data = nullptr;
 
         // Number of dimensions
         size_t num_dimensions   = 0;

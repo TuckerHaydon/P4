@@ -4,11 +4,12 @@
 #include <Eigen/Core>
 
 #include "polynomial_gradient.h"
+#include "common.h"
 
 namespace p4 {
   namespace {
     // Upper-level cost function of the form: 
-    //   f(x*, y) = x' P x + ones() * y
+    //   f(x*, y) = 0.5 * x' P x + ones() * y
     //
     // Want to determine the gradient with respect to y, holding x* constant.
     // Although automatic differentiation is not necessary (gradient is just
@@ -50,13 +51,14 @@ namespace p4 {
         const auto x = 
           Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, 1>>(
               this->solver_solution_.workspace->solution->x,
-              this->solver_solution_.workspace->data->n).cast<T>();
+              this->solver_solution_.data->n).cast<T>();
 
         // Cast quadratic matrix to type Jet
-        // const auto P = 
-        //   Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>>(
-        //       this->solver_solution_.workspace->data->A,
-        //       this->solver_solution_.workspace->data->n).cast<T>();
+        Eigen::SparseMatrix<double> P_float;
+        OSQP2Eigen(
+              this->solver_solution_.data->P,
+              P_float);
+        const Eigen::SparseMatrix<T> P = P_float.cast<T>();
 
         // Compose times in Eigen vector
         // times is a vector, but is represented as a double pointer due to the
@@ -66,9 +68,8 @@ namespace p4 {
 
 
         // Fill cost function/residuals
-        // residuals[0] = x.transpose() * P * x + 
-        //   Eigen::Matrix<T, S, 1>::Ones().transpose() * y; 
-        residuals[0] = Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(size_y, 1).transpose() * y; 
+        residuals[0] = (T(0.5) * x.transpose() * P * x + 
+          Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(size_y, 1).transpose() * y).eval()(0,0); 
     
         return true;
       }
@@ -130,19 +131,16 @@ namespace p4 {
     };
   }
 
-  void PolynomialGradient::Test(const PolynomialSolver::Solution& solver_solution) {
-    // Initial Values
-    const std::vector<double> initial_times = {1.0, 2.0, 5.0};
-    const size_t times_size = initial_times.size();
+  void PolynomialGradient::Test(
+      const std::vector<double>& initial_times,
+      const PolynomialSolver::Solution& solver_solution) {
 
     // Structures for autodiff evaluation
+    const size_t times_size = initial_times.size();
     SmartBuffer2D times(1,times_size);
     std::memcpy(times.Get()[0], initial_times.data(), times_size * sizeof(double));
     SmartBuffer1D residuals(1);
     SmartBuffer2D jacobian(1, times_size);
-
-    // Coefficients. Empty atm.
-    std::vector<std::vector<Eigen::VectorXd>> coefficients;
 
     // Cost function
     const ceres::CostFunction* cost_function 
@@ -166,6 +164,7 @@ namespace p4 {
 
 
   PolynomialGradient::Solution PolynomialGradient::Run(
+      const std::vector<double>& initial_times,
       const PolynomialSolver::Solution& solver_solution) {
 
     return PolynomialGradient::Solution();
