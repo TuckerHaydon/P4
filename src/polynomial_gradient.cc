@@ -2,6 +2,7 @@
 
 #include <ceres/ceres.h>
 #include <Eigen/Core>
+#include <Eigen/QR>    
 
 #include "polynomial_gradient.h"
 #include "common.h"
@@ -73,6 +74,10 @@ namespace p4 {
         PolynomialSolver::Solution solver_solution_;
     };
 
+    // Cost function that encapsulates the cost of constraints of the form: 
+    //   g(x*, y) <= 0
+    //
+    // Want to determine the gradient with respect to y, holding x* constant.
     class ConstraintCostFunction {
      public:
       ConstraintCostFunction(
@@ -210,6 +215,12 @@ namespace p4 {
     // Prepare initial guess accessor. Need pointer to pointer.
     const double* initial_times_ptr = initial_times.data();
 
+    // Prepare times Eigen vector
+    Eigen::Matrix<double, Eigen::Dynamic, 1> times(initial_times.size());
+    for(size_t time_idx = 0; time_idx < initial_times.size(); ++time_idx) {
+      times(time_idx) = initial_times[time_idx];
+    }
+
     // Extract lagrange multipliers. See documentation in header file for how
     // they are split.
     const auto y = 
@@ -299,21 +310,73 @@ namespace p4 {
       } else {
         std::cout << "Jacobian Failed!" << std::endl;
       }
+    }    
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient = 
+      (objective_jacobian + lambda.transpose() * constraints_jacobian).transpose();
+
+    { // Project the gradient onto the null space of the timing constraints: Ax-b<=0
+      // Resources:
+      // http://www2.esm.vt.edu/~zgurdal/COURSES/4084/4084-Docs/LECTURES/GradProj.pdf
+      
+      // Two inequality constraints are used to constrain the initial node to zero
+      // N-1 constaints are used to constrain the time vector to be monotonic,
+      // positive
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> A(
+          2 + solver_solution.constants.num_nodes - 1, 
+          solver_solution.constants.num_nodes);  
+      A.fill(0);
+
+      Eigen::Matrix<double, Eigen::Dynamic, 1> b(2 + solver_solution.constants.num_nodes - 1);
+      b.fill(0);
+
+      // Constrain initial time to zero
+      A(0,0) = +1;
+      A(1,0) = -1;
+
+      // Constrain time vector to be monotonic, positive
+      A.block(2,0,solver_solution.constants.num_nodes - 1, solver_solution.constants.num_nodes-1).diagonal(0) =
+        Eigen::Matrix<double, Eigen::Dynamic, 1>::Ones(solver_solution.constants.num_nodes - 1);
+      A.block(2,1,solver_solution.constants.num_nodes - 1, solver_solution.constants.num_nodes-1).diagonal(0) =
+        -1 * Eigen::Matrix<double, Eigen::Dynamic, 1>::Ones(solver_solution.constants.num_nodes - 1);
+
+      // Select active constraints
+      const Eigen::Matrix<double, Eigen::Dynamic, 1> timing_constraints = A * times - b;
+      std::vector<size_t> active_constraint_indices;
+      for(size_t constraint_idx = 0; constraint_idx < timing_constraints.rows(); ++constraint_idx) {
+        // If the constraint is approximately zero, consider it active
+        if(abs(timing_constraints(constraint_idx)) < 1e-4) {
+          active_constraint_indices.push_back(constraint_idx);
+        }
+      }
+
+      // N is the matrix of active constraints
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> N(
+          active_constraint_indices.size(), 
+          solver_solution.constants.num_nodes);
+      for(size_t constraint_idx = 0; constraint_idx < N.rows(); ++constraint_idx) {
+        N.row(constraint_idx) = A.row(active_constraint_indices[constraint_idx]);
+      }
+
+      // Project the gradient onto the null space of the constraints
+      // Must use pseudo-inverse as the constraint matrix is often singular. I
+      // believe this 
+      Eigen::Matrix<double, Eigen::Dynamic, 1> s = 
+        (
+         Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>::Identity(
+           solver_solution.constants.num_nodes, 
+           solver_solution.constants.num_nodes) 
+         - N.transpose() * (N * N.transpose()).completeOrthogonalDecomposition().pseudoInverse() * N)
+        * gradient;
+
+      gradient = s.normalized();
     }
 
-    // std::cout << "Objective Jacobian" << std::endl;
-    // std::cout << objective_jacobian << std::endl;
-    // std::cout << "" << std::endl;
+    // Compose solution
+    Solution solution;
+    solution.gradient = gradient;
 
-    // std::cout << "Constraints Jacobian" << std::endl;
-    // std::cout << constraints_jacobian << std::endl;
-    // std::cout << "" << std::endl;
-    
-    const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient = 
-      objective_jacobian + lambda.transpose() * constraints_jacobian;
-    std::cout << "Gradient:" << std::endl;
     std::cout << gradient << std::endl;
 
-    return PolynomialGradient::Solution();
+    return solution;
   }
 }

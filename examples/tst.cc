@@ -10,7 +10,7 @@ using namespace p4;
 int main(int argc, char** argv) {
 
   // Set up example problem
-  const std::vector<double> initial_times = {0.0, 5.0};
+  const std::vector<double> initial_times = {0.0, 5.0, 10.0};
   const std::vector<NodeEqualityBound> node_equality_bounds = {
     // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
     // Constraining position, velocity, and acceleration of first node to zero
@@ -18,10 +18,13 @@ int main(int argc, char** argv) {
     NodeEqualityBound(0,0,1,0),
     NodeEqualityBound(0,0,2,0),
 
-    // Constraining position, velocity, and acceleration of second node
+    // Constraining position of second node
     NodeEqualityBound(0,1,0,1),
-    NodeEqualityBound(0,1,1,0),
-    NodeEqualityBound(0,1,2,0),
+
+    // Constraining position, velocity, and acceleration of third node
+    NodeEqualityBound(0,2,0,2.5),
+    NodeEqualityBound(0,2,1,0),
+    NodeEqualityBound(0,2,2,0),
   };
   const std::vector<NodeInequalityBound> node_inequality_bounds = {
   // NodeInequalityBound(dimension_idx, node_idx, derivative_idx, lower, upper)
@@ -29,7 +32,10 @@ int main(int argc, char** argv) {
   const std::vector<SegmentInequalityBound> segment_inequality_bounds = {
     // SegmentInequalityBound(segment_idx, derivative_idx, mapping, value)
     SegmentInequalityBound(0,1,(Eigen::Matrix<double,1,1>() << 1).finished(),1),
-    SegmentInequalityBound(0,2,(Eigen::Matrix<double,1,1>() << 1).finished(),2),
+    SegmentInequalityBound(0,2,(Eigen::Matrix<double,1,1>() << 1).finished(),1),
+
+    SegmentInequalityBound(1,1,(Eigen::Matrix<double,1,1>() << 1).finished(),1),
+    SegmentInequalityBound(1,2,(Eigen::Matrix<double,1,1>() << 1).finished(),1),
   };
 
   PolynomialSolver::Options solver_options;

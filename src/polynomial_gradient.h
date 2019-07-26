@@ -40,9 +40,9 @@ namespace p4 {
   //   P(y) = P : Constant due to the normalization of the time segments
   //   q(y) = 0 : No linear cost
   //   c(y) = ones() * y : penalize total time
-  //   A = diag(-1,0) + diag(+1,1) : Difference adjacent times
+  //   A = diag(-1,0) + diag(+1,1) : Difference adjacent times are require >= 0
   //   b = 0 : Used with A to ensure time is increasing
-  //   C,y = 0: Unused at current moment. Used to enforce total time constraint.
+  //   C,y = 0: Enforce the initial time is zero
   //   g(x*,y) = G(y) x - h(y)
   //
   // Recall that the sub-level optimization problem required the following
@@ -84,7 +84,7 @@ namespace p4 {
       };
 
       struct Solution {
-        std::vector<double> times;
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient;
 
         Solution() {}
       };
