@@ -64,7 +64,14 @@ namespace p4 {
   //   G(y) = [-N(y); N(y)]
   //   h(y) = [ l(y); u(y)]
   //
+  // However, OSQP overloads the lagrange multipliers. There should be 2*m
+  // lagrange multipliers, but OSQP returns only m. The kkt conditions require:
+  //   lambda+ * ( N(y)x - u(y)) = 0
+  //   lambda- * (-N(y)x + l(y)) = 0
   //
+  // Where:
+  //   lambda+ = max(lambda, 0)
+  //   lambda- = min(y,0) * -1
   //
   // Resources:
   // 1) Fast UAV Trajectory Optimization using Bilevel Optimization with
@@ -89,10 +96,6 @@ namespace p4 {
       // Leverage google::ceres and its automatic differentiation engine to
       // determing the numeric derivatives.
       Solution Run(
-          const std::vector<double>& initial_times,
-          const PolynomialSolver::Solution& solver_solution);
-
-      void Test(
           const std::vector<double>& initial_times,
           const std::shared_ptr<const PolynomialSolver>& solver,
           const PolynomialSolver::Solution& solver_solution);
