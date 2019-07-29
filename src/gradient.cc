@@ -66,8 +66,6 @@ namespace p4 {
         // Fill cost function/residuals
         residuals[0] = (T(0.5) * x.transpose() * P * x + 
           Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(times_size, 1).transpose() * t).eval()(0,0);
-        // residuals[0] = (T(0.5) * x.transpose() * P * x + 
-        //   t.transpose() * t).eval()(0,0);
     
         return true;
       }

@@ -27,7 +27,8 @@ namespace p4 {
 
       struct Solution {
         PolynomialSolver::Solution solver_solution;
-
+        std::vector<double> times;
+        bool success;
         Solution() {}
       };
 

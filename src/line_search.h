@@ -3,6 +3,7 @@
 #pragma once
 
 #include "polynomial_solver.h"
+#include "gradient.h"
 
 namespace p4 {
   class LineSearch {
@@ -16,7 +17,6 @@ namespace p4 {
 
       struct Solution {
         std::vector<double> times;
-
         Solution() {}
       };
 
@@ -24,8 +24,10 @@ namespace p4 {
         : options_(options) {}
 
       Solution Run(
-          const std::vector<double>& times,
-          const std::shared_ptr<PolynomialSolver>& solver);
+        const std::vector<double>& initial_times,
+        const std::shared_ptr<PolynomialSolver>& solver,
+        const PolynomialSolver::Solution& initial_solver_solution,
+        const Gradient::Solution& gradient_solution) const;
 
     private:
       Options options_;

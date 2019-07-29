@@ -83,7 +83,7 @@ namespace p4 {
       };
 
       struct Solution {
-        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient;
+        Eigen::Matrix<double, Eigen::Dynamic, 1> gradient;
         Solution() {}
       };
 

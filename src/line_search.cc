@@ -7,7 +7,9 @@
 namespace p4 {
   LineSearch::Solution LineSearch::Run(
     const std::vector<double>& initial_times,
-    const std::shared_ptr<PolynomialSolver>& solver) {
+    const std::shared_ptr<PolynomialSolver>& solver,
+    const PolynomialSolver::Solution& initial_solver_solution,
+    const Gradient::Solution& gradient_solution) const {
 
     // Prepare times Eigen vector
     Eigen::Matrix<double, Eigen::Dynamic, 1> times(initial_times.size());
@@ -16,14 +18,7 @@ namespace p4 {
     }
 
     // Initial search point.
-    PolynomialSolver::Solution initial_solver_solution = solver->Run(initial_times);
     double initial_cost = initial_solver_solution.workspace->info->obj_val;
-
-    // Determine gradient
-    Gradient::Options gradient_options;
-    Gradient gradient(gradient_options);
-    Gradient::Solution gradient_solution = 
-      gradient.Run(initial_times, solver, initial_solver_solution);
     
     // Line search
     double alpha = this->options_.alpha_0;
@@ -31,8 +26,8 @@ namespace p4 {
     Eigen::Matrix<double, Eigen::Dynamic, 1> previous_times = times;
     for(size_t iteration_idx = 0; iteration_idx < this->options_.max_iterations; ++iteration_idx) {
       // Upate step
+      // TODO: Is this plus or minus?
       Eigen::Matrix<double, Eigen::Dynamic, 1> candidate_times = 
-        // TODO: Is this plus or minus?
         times - alpha * gradient_solution.gradient;
 
       // Check candidate_times valid
