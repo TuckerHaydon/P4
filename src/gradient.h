@@ -79,13 +79,11 @@ namespace p4 {
   class PolynomialGradient {
     public:
       struct Options {
-
         Options() {}
       };
 
       struct Solution {
         Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient;
-
         Solution() {}
       };
 

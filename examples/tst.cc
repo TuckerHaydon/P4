@@ -3,7 +3,7 @@
 #include <cstdlib>
 
 #include "polynomial_solver.h"
-#include "polynomial_gradient.h"
+#include "gradient.h"
 
 using namespace p4;
 
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
           node_equality_bounds,
           node_inequality_bounds,
           segment_inequality_bounds);
-  PolynomialSolver::Solution solver_solution = solver->Run();
+  PolynomialSolver::Solution solver_solution = solver->Run(initial_times);
 
   PolynomialGradient gradient;
   gradient.Run(

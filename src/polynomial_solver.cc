@@ -23,7 +23,6 @@ namespace p4 {
     }
 
     // Cache user input in the workspace
-    this->workspace_.times = times;
     this->workspace_.explicit_node_equality_bounds = explicit_node_equality_bounds;
     this->workspace_.explicit_node_inequality_bounds = explicit_node_inequality_bounds;
     this->workspace_.explicit_segment_inequality_bounds = explicit_segment_inequality_bounds;
@@ -83,7 +82,7 @@ namespace p4 {
 
     // Fill constraints
     this->SetConstraints<double>(
-        this->workspace_.times,
+        times,
         this->workspace_.lower_bound_vec, 
         this->workspace_.upper_bound_vec, 
         this->workspace_.sparse_constraint_mat);
@@ -102,7 +101,8 @@ namespace p4 {
   }
 
 
-  PolynomialSolver::Solution PolynomialSolver::Run() {
+  PolynomialSolver::Solution PolynomialSolver::Run(
+      const std::vector<double>& times) {
     // Convert to solver data types
     csc* P = nullptr;
     csc* A = nullptr;

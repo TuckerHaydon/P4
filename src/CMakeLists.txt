@@ -9,7 +9,8 @@ find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 set(SOURCE_FILES
   polynomial_solver.cc 
   polynomial_sampler.cc
-  polynomial_gradient.cc
+  gradient.cc
+  line_search.cc
   common.cc
 )
 

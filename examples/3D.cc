@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
         node_equality_bounds,
         node_inequality_bounds,
         segment_inequality_bounds);
-  const PolynomialSolver::Solution solution = solver.Run();
+  const PolynomialSolver::Solution solution = solver.Run(times);
   // Print some output info
   // Reference: https://osqp.org/docs/interfaces/cc++#info
   std::cout << "Status:                    " << solution.workspace->info->status << std::endl;

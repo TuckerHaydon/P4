@@ -126,7 +126,6 @@ namespace p4 {
       // Structure to cache data in for the Setup() function.
       struct Workspace {
         // Supplied by user
-        std::vector<double> times;
         std::vector<NodeEqualityBound> explicit_node_equality_bounds;
         std::vector<NodeInequalityBound> explicit_node_inequality_bounds;
         std::vector<SegmentInequalityBound> explicit_segment_inequality_bounds;
@@ -166,7 +165,7 @@ namespace p4 {
           const std::vector<SegmentInequalityBound>& segment_inequality_bounds);
   
       // Run the QP solver
-      Solution Run();
+      Solution Run(const std::vector<double>& times);
 
     template <class T>
     void SetQuadraticCost(Eigen::SparseMatrix<T>& sparse_quadratic_mat) const;

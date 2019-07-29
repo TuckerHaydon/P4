@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
 
   PolynomialSolver solver(solver_options);
   solver.Setup(times, equality_bounds,{},{});
-  const PolynomialSolver::Solution solution = solver.Run();
+  const PolynomialSolver::Solution solution = solver.Run(times);
 
   return EXIT_SUCCESS;
 }

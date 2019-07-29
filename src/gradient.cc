@@ -4,7 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/QR>    
 
-#include "polynomial_gradient.h"
+#include "gradient.h"
 #include "common.h"
 
 namespace p4 {
