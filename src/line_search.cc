@@ -44,10 +44,19 @@ namespace p4 {
         break;
       }
 
+      // Solve!
       PolynomialSolver::Solution solver_solution = 
         solver->Run(std::vector<double>(candidate_times.data(), 
                                         candidate_times.data() + candidate_times.rows()));
+
+      // TODO: More checks!
+      if(solver_solution.workspace->info->status_val != 1) {
+        break;
+      }
+
+
       double candidate_cost = solver_solution.workspace->info->obj_val;
+
 
       if(candidate_cost < previous_cost) {
         previous_cost = candidate_cost;
