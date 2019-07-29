@@ -20,9 +20,9 @@ namespace p4 {
     double initial_cost = initial_solver_solution.workspace->info->obj_val;
 
     // Determine gradient
-    PolynomialGradient::Options gradient_options;
-    PolynomialGradient gradient(gradient_options);
-    PolynomialGradient::Solution gradient_solution = 
+    Gradient::Options gradient_options;
+    Gradient gradient(gradient_options);
+    Gradient::Solution gradient_solution = 
       gradient.Run(initial_times, solver, initial_solver_solution);
     
     // Line search

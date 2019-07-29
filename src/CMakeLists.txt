@@ -10,6 +10,7 @@ set(SOURCE_FILES
   polynomial_solver.cc 
   polynomial_sampler.cc
   gradient.cc
+  gradient_descent.cc
   line_search.cc
   common.cc
 )

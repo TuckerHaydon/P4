@@ -76,7 +76,7 @@ namespace p4 {
   // Resources:
   // 1) Fast UAV Trajectory Optimization using Bilevel Optimization with
   //    Analytical Gradients, Sun et. al., 2018
-  class PolynomialGradient {
+  class Gradient {
     public:
       struct Options {
         Options() {}
@@ -87,7 +87,7 @@ namespace p4 {
         Solution() {}
       };
 
-      PolynomialGradient(const Options& options = Options())
+      Gradient(const Options& options = Options())
         : options_(options) {}
 
       // Evaluate the time-gradient of the bi-level optimization problem.

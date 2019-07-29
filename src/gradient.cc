@@ -210,7 +210,7 @@ namespace p4 {
     };
   }
 
-  PolynomialGradient::Solution PolynomialGradient::Run(
+  Gradient::Solution Gradient::Run(
       const std::vector<double>& initial_times,
       const std::shared_ptr<const PolynomialSolver>& solver,
       const PolynomialSolver::Solution& solver_solution) {
