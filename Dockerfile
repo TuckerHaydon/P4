@@ -11,7 +11,10 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
     make \
     cmake \
     libblas-dev \ 
-    liblapack-dev
+    liblapack-dev \
+    libgoogle-glog-dev \
+    libatlas-base-dev \
+    libsuitesparse-dev
 
 # Install project
 RUN mkdir -p /workspace/
@@ -31,6 +34,11 @@ RUN cd $P4/dependencies/osqp && \
     cd build && \
     cmake -G "Unix Makefiles" .. && \
     cmake --build . && \
+    make install
+RUN cd $P4/dependencies/ceres && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
     make install
 RUN mkdir -p $P4/build && \
     cd $P4/build && \
