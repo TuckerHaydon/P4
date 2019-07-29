@@ -318,9 +318,9 @@ namespace p4 {
       // Resources:
       // http://www2.esm.vt.edu/~zgurdal/COURSES/4084/4084-Docs/LECTURES/GradProj.pdf
       
-      // Two inequality constraints are used to constrain the initial node to zero
-      // N-1 constaints are used to constrain the time vector to be monotonic,
-      // positive
+      // Two inequality constraints are used to constrain the initial node to
+      // the specified time. N-1 constaints are used to constrain the time vector
+      // to be monotonic, positive
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> A(
           2 + solver_solution.constants.num_nodes - 1, 
           solver_solution.constants.num_nodes);  
@@ -329,9 +329,11 @@ namespace p4 {
       Eigen::Matrix<double, Eigen::Dynamic, 1> b(2 + solver_solution.constants.num_nodes - 1);
       b.fill(0);
 
-      // Constrain initial time to zero
+      // Constrain initial time 
       A(0,0) = +1;
       A(1,0) = -1;
+      b(0) = initial_times[0];
+      b(1) = initial_times[0];
 
       // Constrain time vector to be monotonic, positive
       A.block(2,0,solver_solution.constants.num_nodes - 1, solver_solution.constants.num_nodes-1).diagonal(0) =

@@ -10,7 +10,7 @@ using namespace p4;
 int main(int argc, char** argv) {
 
   // Set up example problem
-  const std::vector<double> initial_times = {0.0, 5.0, 10.0};
+  const std::vector<double> initial_times = {1.0, 6.0, 11.0};
   const std::vector<NodeEqualityBound> node_equality_bounds = {
     // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
     // Constraining position, velocity, and acceleration of first node to zero
