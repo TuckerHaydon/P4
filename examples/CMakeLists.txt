@@ -47,9 +47,10 @@ ELSE()
 ENDIF()
 
 
-add_executable(tst tst.cc)
+add_executable(tst tst.cc gnuplot-iostream.h)
 target_link_libraries(tst
   lib_p4
+  ${Boost_LIBRARIES} 
   Eigen3::Eigen
   osqp::osqpstatic
   ${CERES_LIBRARIES}

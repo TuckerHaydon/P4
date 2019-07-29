@@ -73,26 +73,13 @@ namespace p4 {
 
     this->workspace_.constants.num_constraints = num_explicit_constraints + num_implicit_constraints;
 
-    // Allocate constraints
-    this->workspace_.lower_bound_vec.resize(this->workspace_.constants.num_constraints);
-    this->workspace_.upper_bound_vec.resize(this->workspace_.constants.num_constraints);
-    this->workspace_.sparse_constraint_mat = Eigen::SparseMatrix<double>(
-        this->workspace_.constants.num_constraints, 
-        this->workspace_.constants.total_num_params);
-
-    // Fill constraints
-    this->SetConstraints<double>(
-        times,
-        this->workspace_.lower_bound_vec, 
-        this->workspace_.upper_bound_vec, 
-        this->workspace_.sparse_constraint_mat);
-
     // Allocate quadratic matrix
     this->workspace_.sparse_quadratic_mat = Eigen::SparseMatrix<double>(
         this->workspace_.constants.total_num_params, 
         this->workspace_.constants.total_num_params);
 
     // Fill quadratic matrix
+    // Does not depend on time; can pre-compute
     this->SetQuadraticCost<double>(this->workspace_.sparse_quadratic_mat);
 
     // Workspace is now set up
@@ -103,12 +90,28 @@ namespace p4 {
 
   PolynomialSolver::Solution PolynomialSolver::Run(
       const std::vector<double>& times) {
+
+    // Allocate constraints
+    Eigen::Matrix<double, Eigen::Dynamic, 1> lower_bound_vec(this->workspace_.constants.num_constraints);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> upper_bound_vec(this->workspace_.constants.num_constraints);
+    Eigen::SparseMatrix<double> sparse_constraint_mat(
+        this->workspace_.constants.num_constraints, 
+        this->workspace_.constants.total_num_params);
+
+    // Fill constraints
+    // Constraints depend on time. Must recompute in Run()
+    this->SetConstraints<double>(
+        times,
+        lower_bound_vec, 
+        upper_bound_vec, 
+        sparse_constraint_mat);
+
     // Convert to solver data types
     csc* P = nullptr;
     csc* A = nullptr;
 
     Eigen2OSQP(this->workspace_.sparse_quadratic_mat, P);
-    Eigen2OSQP(this->workspace_.sparse_constraint_mat, A);
+    Eigen2OSQP(sparse_constraint_mat, A);
 
     c_float q[this->workspace_.constants.total_num_params];
     for(size_t param_idx = 0; param_idx < this->workspace_.constants.total_num_params; ++param_idx) {
@@ -117,8 +120,8 @@ namespace p4 {
 
     c_float l[this->workspace_.constants.num_constraints], u[this->workspace_.constants.num_constraints];
     for(size_t row_idx = 0; row_idx < this->workspace_.constants.num_constraints; ++row_idx) {
-      l[row_idx] = this->workspace_.lower_bound_vec(row_idx);
-      u[row_idx] = this->workspace_.upper_bound_vec(row_idx);
+      l[row_idx] = lower_bound_vec(row_idx);
+      u[row_idx] = upper_bound_vec(row_idx);
     }
 
     // Run the solver
@@ -152,8 +155,10 @@ namespace p4 {
     osqp_solve(solution.workspace.get());
 
     // Append the total time to the objective cost. 
-    // Total time is last time - first time
-    solution.workspace->info->obj_val += (times[times.size() - 1] - times[0]);
+    for(size_t time_idx = 0; time_idx < times.size(); ++time_idx) {
+      // solution.workspace->info->obj_val += times[time_idx] * times[time_idx];
+      solution.workspace->info->obj_val += times[time_idx];
+    }
 
     // Return the solution
     return solution;

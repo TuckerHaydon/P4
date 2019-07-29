@@ -137,9 +137,9 @@ namespace p4 {
         Constants constants;
 
         // Constraints
-        Eigen::Matrix<double, Eigen::Dynamic, 1> lower_bound_vec;
-        Eigen::Matrix<double, Eigen::Dynamic, 1> upper_bound_vec;
-        Eigen::SparseMatrix<double> sparse_constraint_mat;
+        // Eigen::Matrix<double, Eigen::Dynamic, 1> lower_bound_vec;
+        // Eigen::Matrix<double, Eigen::Dynamic, 1> upper_bound_vec;
+        // Eigen::SparseMatrix<double> sparse_constraint_mat;
 
         // Quadratic matrix
         Eigen::SparseMatrix<double> sparse_quadratic_mat;

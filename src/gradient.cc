@@ -10,14 +10,14 @@
 namespace p4 {
   namespace {
     // Upper-level cost function of the form: 
-    //   f(x*, y) = 0.5 * x' P x + ones() * y
+    //   f(x*, y) = 0.5 * x' P x +  c(y)
     //
     // Want to determine the gradient with respect to y, holding x* constant.
     // Although automatic differentiation is not necessary (gradient is just
     // ones()), this class is included for consistency and in case a new
     // time-dependent function is introduced.
     //
-    // TODO: Remove extra computation and just return ones()
+    // TODO: Call solver and evaluate
     class ObjectiveCostFunction {
      public:
       ObjectiveCostFunction(const PolynomialSolver::Solution& solver_solution)
@@ -65,7 +65,9 @@ namespace p4 {
 
         // Fill cost function/residuals
         residuals[0] = (T(0.5) * x.transpose() * P * x + 
-          Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(times_size, 1).transpose() * t).eval()(0,0); 
+          Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(times_size, 1).transpose() * t).eval()(0,0);
+        // residuals[0] = (T(0.5) * x.transpose() * P * x + 
+        //   t.transpose() * t).eval()(0,0);
     
         return true;
       }
@@ -312,6 +314,7 @@ namespace p4 {
       }
     }    
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> gradient = 
+      // TODO: Plus or minus lambda??
       (objective_jacobian + lambda.transpose() * constraints_jacobian).transpose();
 
     { // Project the gradient onto the null space of the timing constraints: Ax-b<=0
@@ -376,8 +379,6 @@ namespace p4 {
     // Compose solution
     Solution solution;
     solution.gradient = gradient;
-
-    std::cout << gradient << std::endl;
 
     return solution;
   }
