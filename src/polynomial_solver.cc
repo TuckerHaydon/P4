@@ -10,22 +10,15 @@
 #include "polynomial_solver.h"
 
 namespace p4 {
-  bool PolynomialSolver::Setup(
-      const std::vector<double>& times,
-      const std::vector<NodeEqualityBound>& explicit_node_equality_bounds,
-      const std::vector<NodeInequalityBound>& explicit_node_inequality_bounds,
-      const std::vector<SegmentInequalityBound>& explicit_segment_inequality_bounds) {
-
-    // Checks
-    if(times.size() < 2) {
-      std::cerr << "PolynomialSolver::Setup -- Time vector must have a size greater than one." << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
-
+  PolynomialSolver::PolynomialSolver(const Options& options)
+    : options_(options) {
     // Cache user input in the workspace
-    this->workspace_.explicit_node_equality_bounds = explicit_node_equality_bounds;
-    this->workspace_.explicit_node_inequality_bounds = explicit_node_inequality_bounds;
-    this->workspace_.explicit_segment_inequality_bounds = explicit_segment_inequality_bounds;
+    this->workspace_.explicit_node_equality_bounds = 
+      this->options_.node_equality_bounds;
+    this->workspace_.explicit_node_inequality_bounds = 
+      this->options_.node_inequality_bounds;
+    this->workspace_.explicit_segment_inequality_bounds = 
+      this->options_.segment_inequality_bounds;
 
     // Cache constants in the workspace
     this->workspace_.constants.num_dimensions = 
@@ -39,7 +32,7 @@ namespace p4 {
     this->workspace_.constants.num_intermediate_points = 
       this->options_.num_intermediate_points;
     this->workspace_.constants.num_nodes = 
-      times.size();
+      this->options_.num_nodes;
     this->workspace_.constants.num_segments = 
       this->workspace_.constants.num_nodes - 1;
     this->workspace_.constants.num_params_per_node_per_dim = 
@@ -82,9 +75,6 @@ namespace p4 {
     // Does not depend on time; can pre-compute
     this->SetQuadraticCost<double>(this->workspace_.sparse_quadratic_mat);
 
-    // Workspace is now set up
-    this->workspace_.setup = true;
-    return true;
   }
 
 

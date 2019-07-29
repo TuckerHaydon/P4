@@ -52,6 +52,10 @@ namespace p4 {
         size_t polynomial_order = 0;
         size_t derivative_order = 0;
         size_t continuity_order = 0;
+        size_t num_nodes        = 0;
+        std::vector<NodeEqualityBound> node_equality_bounds = {};
+        std::vector<NodeInequalityBound> node_inequality_bounds = {};
+        std::vector<SegmentInequalityBound> segment_inequality_bounds = {};
 
         // Optional. Number of intermediate points for segment inequality constraints
         size_t num_intermediate_points = 20;
@@ -126,46 +130,24 @@ namespace p4 {
             const size_t node_idx) const;
       };
 
-      // Structure to cache data in for the Setup() function.
+      // Structure to cache data in
       struct Workspace {
-        // Supplied by user
-        std::vector<NodeEqualityBound> explicit_node_equality_bounds;
-        std::vector<NodeInequalityBound> explicit_node_inequality_bounds;
-        std::vector<SegmentInequalityBound> explicit_segment_inequality_bounds;
-
         // Filled in
         Constants constants;
 
         // Constraints
-        // Eigen::Matrix<double, Eigen::Dynamic, 1> lower_bound_vec;
-        // Eigen::Matrix<double, Eigen::Dynamic, 1> upper_bound_vec;
-        // Eigen::SparseMatrix<double> sparse_constraint_mat;
+        std::vector<NodeEqualityBound> explicit_node_equality_bounds = {};
+        std::vector<NodeInequalityBound> explicit_node_inequality_bounds = {};
+        std::vector<SegmentInequalityBound> explicit_segment_inequality_bounds = {};
 
         // Quadratic matrix
         Eigen::SparseMatrix<double> sparse_quadratic_mat;
-
-        // Run() should only be called if this is true
-        bool setup = false;
 
         Workspace() {}
       };
 
       // Constructor
-      PolynomialSolver(const Options& options = Options())
-        : options_(options) {}
-
-      // Setup translates input data into structures to be used by the QP
-      // solver. Depending on the size of the problem, this function may be
-      // expensive as it allocates space for large data types.
-      //
-      // Setup must be called before Run().
-      //
-      // Returns true if solver is set up. Returns false if an error occurred.
-      bool Setup(
-          const std::vector<double>& times,
-          const std::vector<NodeEqualityBound>& node_equality_bounds,
-          const std::vector<NodeInequalityBound>& node_inequality_bounds,
-          const std::vector<SegmentInequalityBound>& segment_inequality_bounds);
+      PolynomialSolver(const Options& options = Options());
   
       // Run the QP solver
       Solution Run(const std::vector<double>& times);

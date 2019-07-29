@@ -56,6 +56,10 @@ int main(int argc, char** argv) {
   solver_options.polynomial_order = 8;   // Fit an 8th-order polynomial
   solver_options.continuity_order = 4;   // Require continuity through the 4th derivative
   solver_options.derivative_order = 2;   // Minimize the 2nd derivative (acceleration)
+  solver_options.num_nodes                 = times.size();
+  solver_options.node_equality_bounds      = node_equality_bounds;
+  solver_options.node_inequality_bounds    = node_inequality_bounds;
+  solver_options.segment_inequality_bounds = segment_inequality_bounds;
 
   // Configure the OSQP settings
   // Reference: https://osqp.org/docs/interfaces/cc++#settings
@@ -64,11 +68,6 @@ int main(int argc, char** argv) {
 
   // Solve
   PolynomialSolver solver(solver_options);
-  solver.Setup(
-        times, 
-        node_equality_bounds,
-        node_inequality_bounds,
-        segment_inequality_bounds);
   const PolynomialSolver::Solution solution = solver.Run(times);
   // Print some output info
   // Reference: https://osqp.org/docs/interfaces/cc++#info

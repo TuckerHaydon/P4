@@ -56,13 +56,12 @@ int main(int argc, char** argv) {
   solver_options.osqp_settings.scaling    = 0;
   solver_options.osqp_settings.polish     = 1;
   solver_options.osqp_settings.warm_start = 0;
+  solver_options.num_nodes                 = initial_times.size();
+  solver_options.node_equality_bounds      = node_equality_bounds;
+  solver_options.node_inequality_bounds    = node_inequality_bounds;
+  solver_options.segment_inequality_bounds = segment_inequality_bounds;
 
   auto solver = std::make_shared<PolynomialSolver>(solver_options);
-  solver->Setup(
-          initial_times,
-          node_equality_bounds,
-          node_inequality_bounds,
-          segment_inequality_bounds);
 
   std::vector<double> times = initial_times;
   std::cout << Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, 1>>(times.data(), times.size()).transpose() << std::endl;

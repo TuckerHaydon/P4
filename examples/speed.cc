@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
   // 2) Node index
   // 3) Derivative index
   // 4) Value
-  std::vector<NodeEqualityBound> equality_bounds = {
+  std::vector<NodeEqualityBound> node_equality_bounds = {
     NodeEqualityBound(0,0,0,0),
     NodeEqualityBound(0,0,1,0),
     NodeEqualityBound(0,0,2,0),
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
   for(size_t node_idx = 1; node_idx < num_nodes; ++node_idx) {
     times.push_back(node_idx);
 
-    equality_bounds.push_back(NodeEqualityBound(0,node_idx,0,node_idx));
+    node_equality_bounds.push_back(NodeEqualityBound(0,node_idx,0,node_idx));
   }
 
   PolynomialSolver::Options solver_options;
@@ -36,12 +36,15 @@ int main(int argc, char** argv) {
   solver_options.polynomial_order = 7;
   solver_options.continuity_order = 4;
   solver_options.derivative_order = 4;
+  solver_options.num_nodes                 = times.size();
+  solver_options.node_equality_bounds      = node_equality_bounds;
+  solver_options.node_inequality_bounds    = {};
+  solver_options.segment_inequality_bounds = {};
 
-  solver_options.osqp_settings.polish = true;      // Polish the solution, getting the best answer possible
+  solver_options.osqp_settings.polish  = true;     // Polish the solution, getting the best answer possible
   solver_options.osqp_settings.verbose = true;     // Suppress the printout
 
   PolynomialSolver solver(solver_options);
-  solver.Setup(times, equality_bounds,{},{});
   const PolynomialSolver::Solution solution = solver.Run(times);
 
   return EXIT_SUCCESS;
