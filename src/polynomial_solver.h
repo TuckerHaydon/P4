@@ -21,7 +21,7 @@ namespace p4 {
    *   ...
    *
    * finds the minimum of the following cost function:
-   *   x^T P x
+   *   x^T P x + T (total time)
    *
    * subject to continuity and path constraints.
    *
@@ -38,7 +38,10 @@ namespace p4 {
    * 2) continuity_order must be less than polynomial_order.
    * 3) state vector is ordered first by polynomial index, then by segment index,
    *    and finally by dimension index.
-   * 4) see theory documention for further information
+   * 4) The total time does not impact the quadratic programming solution since
+   *    the QP solver only varies coefficients. It is included in the total cost
+   *    for the bi-level optimizer.
+   * 5) see theory documention for further information
    */
   class PolynomialSolver {
     public:

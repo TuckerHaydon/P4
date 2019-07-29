@@ -151,6 +151,10 @@ namespace p4 {
     // Solve
     osqp_solve(solution.workspace.get());
 
+    // Append the total time to the objective cost. 
+    // Total time is last time - first time
+    solution.workspace->info->obj_val += (times[times.size() - 1] - times[0]);
+
     // Return the solution
     return solution;
   }
