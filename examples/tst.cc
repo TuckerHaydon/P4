@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <algorithm>
 
 #include "gradient_descent.h"
 #include "polynomial_sampler.h"
@@ -12,7 +13,7 @@ using namespace p4;
 int main(int argc, char** argv) {
 
   // Set up example problem
-  const std::vector<double> initial_times = {0.0, 2.0, 10.0};
+  const std::vector<double> initial_times = {0.0, 10.0, 20.0};
   const std::vector<NodeEqualityBound> node_equality_bounds = {
     // NodeEqualityBound(dimension_idx, node_idx, derivative_idx, value)
     // Constraining position, velocity, and acceleration of first node to zero
@@ -55,6 +56,9 @@ int main(int argc, char** argv) {
   solver_options.node_equality_bounds      = node_equality_bounds;
   solver_options.node_inequality_bounds    = node_inequality_bounds;
   solver_options.segment_inequality_bounds = segment_inequality_bounds;
+  solver_options.c = [](const std::vector<double>& times) {
+    return std::accumulate(times.begin(), times.end(), 0.0);
+  };
 
   // Perform gradient descent
   GradientDescent::Options gradient_descent_options;

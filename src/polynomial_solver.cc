@@ -144,11 +144,8 @@ namespace p4 {
     // Solve
     osqp_solve(solution.workspace.get());
 
-    // Append the total time to the objective cost. 
-    for(size_t time_idx = 0; time_idx < times.size(); ++time_idx) {
-      // solution.workspace->info->obj_val += times[time_idx] * times[time_idx];
-      solution.workspace->info->obj_val += times[time_idx];
-    }
+    // Append C(y) to the total cost
+    solution.workspace->info->obj_val += this->options_.c(times);
 
     // Return the solution
     return solution;

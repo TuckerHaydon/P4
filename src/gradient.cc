@@ -3,6 +3,7 @@
 #include <ceres/ceres.h>
 #include <Eigen/Core>
 #include <Eigen/QR>    
+#include <functional>
 
 #include "gradient.h"
 #include "common.h"
@@ -13,21 +14,22 @@ namespace p4 {
     //   f(x*, y) = 0.5 * x' P x +  c(y)
     //
     // Want to determine the gradient with respect to y, holding x* constant.
-    // Although automatic differentiation is not necessary (gradient is just
-    // ones()), this class is included for consistency and in case a new
-    // time-dependent function is introduced.
-    //
-    // TODO: Call solver and evaluate
+    // Just evaluates c(y). Since c(y) is user-provided and not known at
+    // compile-time, must user numeric differentiation
     class ObjectiveCostFunction {
      public:
-      ObjectiveCostFunction(const PolynomialSolver::Solution& solver_solution)
-        : solver_solution_(solver_solution) {}
+      ObjectiveCostFunction(
+          const PolynomialSolver::Solution& solver_solution,
+          const std::function<double(const std::vector<double>&)>& c)
+        : solver_solution_(solver_solution),
+          c_(c) {}
     
       static ceres::CostFunction* Create(
-          const PolynomialSolver::Solution& solver_solution) {
+          const PolynomialSolver::Solution& solver_solution,
+          const std::function<double(const std::vector<double>&)>& c) {
         auto cost_function = 
-          new ceres::DynamicAutoDiffCostFunction<ObjectiveCostFunction>(
-            new ObjectiveCostFunction(solver_solution));
+          new ceres::DynamicNumericDiffCostFunction<ObjectiveCostFunction, ceres::RIDDERS>(
+            new ObjectiveCostFunction(solver_solution, c));
         // The number of nodes is equal to the number of times to optimize
         cost_function->AddParameterBlock(solver_solution.constants.num_nodes);
         // There is only one residual: the evaluated cost function
@@ -43,35 +45,14 @@ namespace p4 {
         // Get the size of the time vector
         const int32_t times_size = this->solver_solution_.constants.num_nodes;
 
-        // Cast constant coefficients to type Jet
-        const auto x = 
-          Eigen::Map<const Eigen::Matrix<c_float, Eigen::Dynamic, 1>>(
-              this->solver_solution_.workspace->solution->x,
-              this->solver_solution_.data->n).cast<T>();
-
-        // Cast quadratic matrix to type Jet
-        Eigen::SparseMatrix<c_float> P_float;
-        OSQP2Eigen(
-              this->solver_solution_.data->P,
-              P_float);
-        const Eigen::SparseMatrix<T> P = P_float.cast<T>();
-
-        // Compose times in Eigen vector
-        // times is a vector, but is represented as a double pointer due to the
-        // DynamicAutoDiffCostFunction interface
-        const auto t =
-          Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>>(times[0], times_size);
-
-
-        // Fill cost function/residuals
-        residuals[0] = (T(0.5) * x.transpose() * P * x + 
-          Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(times_size, 1).transpose() * t).eval()(0,0);
+        residuals[0] = this->c_(std::vector<double>(times[0], times[0]+times_size));
     
         return true;
       }
     
       private:
         PolynomialSolver::Solution solver_solution_;
+        std::function<double(const std::vector<double>)> c_;
     };
 
     // Cost function that encapsulates the cost of constraints of the form: 
@@ -242,7 +223,7 @@ namespace p4 {
 
       // Cost function
       const ceres::CostFunction* cost_function 
-        = ObjectiveCostFunction::Create(solver_solution);
+        = ObjectiveCostFunction::Create(solver_solution, solver->C());
 
       // Evaluate gradient
       bool success = cost_function->Evaluate(

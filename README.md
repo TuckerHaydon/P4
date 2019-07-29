@@ -164,7 +164,7 @@ For a quick build and test, consider using the included docker file. It's not
 set up to attach to a display, so the 3D example is not built by default. Build
 and run the docker image and speed executable:
 ```
-docker build --tag=p4 . && docker run -it p4
+docker build --tag=p4 --rm . && docker run -it --rm p4
 --> ./speed
 ```
 

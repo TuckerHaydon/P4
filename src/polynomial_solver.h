@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <memory>
+#include <functional>
 
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
@@ -20,8 +21,8 @@ namespace p4 {
    *   p_3(t) = c_30 (1/0! t^0) + c_31 (1/1! t^1) + c_32 (1/2! t^2) + c_33 (1/3! t^3) + ...
    *   ...
    *
-   * finds the minimum of the following cost function:
-   *   x^T P x + T (total time)
+   * finds the minimum (x) of the following cost function:
+   *   x^T P x + c(y)
    *
    * subject to continuity and path constraints.
    *
@@ -29,7 +30,7 @@ namespace p4 {
    * chosen to solve this problem. OSQP can efficiently solve sparse QP
    * problems. OSQP requires the problem to be formulated as:
    *   argmin
-   *     x^T P x
+   *     x^T P x + c(y)
    *   subject to
    *     l <= Ax <= u
    *
@@ -38,9 +39,8 @@ namespace p4 {
    * 2) continuity_order must be less than polynomial_order.
    * 3) state vector is ordered first by polynomial index, then by segment index,
    *    and finally by dimension index.
-   * 4) The total time does not impact the quadratic programming solution since
-   *    the QP solver only varies coefficients. It is included in the total cost
-   *    for the bi-level optimizer.
+   * 4) The function c(y) does not affect the QP solution. It contains no
+   *    dependence on x and is only included for the bi-level optimization
    * 5) see theory documention for further information
    */
   class PolynomialSolver {
@@ -59,6 +59,15 @@ namespace p4 {
 
         // Optional. Number of intermediate points for segment inequality constraints
         size_t num_intermediate_points = 20;
+
+        // Optional. c(y), y = time vector
+        std::function<double(const std::vector<double>&)> c = [](const std::vector<double>& times) {
+          double cost = 0.0;
+          for(size_t time_idx = 0; time_idx < times.size(); ++time_idx) {
+            cost += std::pow(times[time_idx + 1] - times[time_idx], 2);
+          }
+          return cost;
+        };
 
         // Optional. Solver settings.
         OSQPSettings osqp_settings;
@@ -176,6 +185,11 @@ namespace p4 {
         Eigen::Matrix<T, Eigen::Dynamic, 1>& lower_bound_vec, 
         Eigen::Matrix<T, Eigen::Dynamic, 1>& upper_bound_vec,
         Eigen::SparseMatrix<T>& sparse_constraint_mat) const;
+
+    // Get the 
+    std::function<double(const std::vector<double>&)> C() const {
+      return this->options_.c;
+    };
   
     private:
       Options options_;
