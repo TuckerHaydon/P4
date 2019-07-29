@@ -4,3 +4,6 @@
 [submodule "dependencies/eigen"]
 	path = dependencies/eigen
 	url = https://github.com/eigenteam/eigen-git-mirror
+[submodule "dependencies/ceres"]
+	path = dependencies/ceres
+	url = https://github.com/ceres-solver/ceres-solver/
